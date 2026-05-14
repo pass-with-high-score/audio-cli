@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/charmbracelet/bubbles/progress"
@@ -39,6 +40,7 @@ var (
 	nowPlayingStyle = lipgloss.NewStyle().Bold(true)
 	dimStyle        = lipgloss.NewStyle().Foreground(subtle)
 	selectedStyle   = lipgloss.NewStyle().Foreground(accent).Bold(true)
+	waveStyle       = lipgloss.NewStyle().Foreground(accent)
 	
 	statusStyle = lipgloss.NewStyle().
 			Border(lipgloss.NormalBorder(), false, false, false, true).
@@ -59,6 +61,31 @@ type Track struct {
 	Artist string
 }
 
+// Visualizer captures audio samples in real-time.
+type Visualizer struct {
+	streamer beep.Streamer
+	samples  []float64
+	mutex    sync.Mutex
+}
+
+func (v *Visualizer) Stream(samples [][2]float64) (n int, ok bool) {
+	n, ok = v.streamer.Stream(samples)
+	if n > 0 {
+		v.mutex.Lock()
+		// Capture raw samples (mono)
+		v.samples = make([]float64, n)
+		for i := 0; i < n; i++ {
+			v.samples[i] = (samples[i][0] + samples[i][1]) / 2
+		}
+		v.mutex.Unlock()
+	}
+	return n, ok
+}
+
+func (v *Visualizer) Err() error {
+	return v.streamer.Err()
+}
+
 type model struct {
 	tracks         []Track
 	filteredTracks []int // Indices of tracks matching search
@@ -67,6 +94,7 @@ type model struct {
 	format         beep.Format
 	ctrl           *beep.Ctrl
 	volume         *effects.Volume
+	visualizer     *Visualizer
 	progress       progress.Model
 	searchBar      textinput.Model
 	searching      bool
@@ -80,6 +108,7 @@ type model struct {
 	pointB         int
 	abActive       bool
 }
+
 
 type tickMsg time.Time
 type loadMsg struct {
@@ -282,6 +311,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		
 		m.ctrl = &beep.Ctrl{Streamer: m.streamer, Paused: false}
 		m.volume = &effects.Volume{Streamer: m.ctrl, Base: 2, Volume: 0, Silent: false}
+		m.visualizer = &Visualizer{streamer: m.volume}
 
 		if !m.initialized {
 			speaker.Init(m.format.SampleRate, m.format.SampleRate.N(time.Second/10))
@@ -289,7 +319,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		speaker.Clear()
-		speaker.Play(m.volume)
+		speaker.Play(m.visualizer)
 		return m, nil
 
 	case tea.KeyMsg:
@@ -460,7 +490,52 @@ func (m model) View() string {
 		}
 		s += nowPlayingStyle.Render("Now Playing: ") + displayTitle + "\n"
 		s += m.progress.ViewAs(percent) + "\n"
-		
+
+		// Render Real-time Waveform
+		if m.visualizer != nil {
+			m.visualizer.mutex.Lock()
+			samples := m.visualizer.samples
+			m.visualizer.mutex.Unlock()
+
+			if len(samples) > 0 {
+				waveWidth := 40
+				if m.width > 20 {
+					waveWidth = m.width - 10
+				}
+				if waveWidth > 80 {
+					waveWidth = 80
+				}
+
+				wave := ""
+				blocks := []string{" ", " ", "▂", "▃", "▄", "▅", "▆", "▇", "█"}
+
+				step := len(samples) / waveWidth
+				if step == 0 {
+					step = 1
+				}
+
+				for i := 0; i < waveWidth; i++ {
+					idx := i * step
+					if idx >= len(samples) {
+						break
+					}
+
+					// Use absolute value for amplitude
+					amp := samples[idx]
+					if amp < 0 {
+						amp = -amp
+					}
+					if amp > 1 {
+						amp = 1
+					}
+
+					blockIdx := int(amp * float64(len(blocks)-1))
+					wave += waveStyle.Render(blocks[blockIdx])
+				}
+				s += " " + wave + "\n"
+			}
+		}
+
 		modeInfo := ""
 		if m.loop { modeInfo += " [Loop] " }
 		if m.shuffle { modeInfo += " [Shuffle] " }

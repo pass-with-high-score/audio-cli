@@ -5,6 +5,7 @@ A clean, professional Terminal User Interface (TUI) music player for macOS writt
 ## Features
 
 - **Multi-format Support**: Plays `.mp3`, `.wav`, `.ogg`, and `.flac`.
+- **Real-time Waveform**: Visual representation of the audio signal.
 - **Clean TUI**: Built with [Bubble Tea](https://github.com/charmbracelet/bubbletea) and [Lip Gloss](https://github.com/charmbracelet/lipgloss).
 - **A-B Repeat**: Mark start (`[`) and end (`]`) points to loop a specific segment.
 - **Metadata Support**: Displays Artist and Title from ID3 tags.
