@@ -14,6 +14,7 @@ import (
 	"github.com/faiface/beep"
 	"github.com/faiface/beep/effects"
 	"github.com/faiface/beep/speaker"
+	"github.com/getlantern/systray"
 )
 
 var (
@@ -335,6 +336,24 @@ func (m model) View() string {
 	}
 	if m.quitting {
 		return "\n  Playlist finished. Goodbye!\n"
+	}
+
+	if m.loading {
+		systray.SetTitle("🎵 Loading...")
+		return "\n  " + dimStyle.Render("Loading...") + "\n"
+	}
+
+	if len(m.filteredTracks) == 0 {
+		return "\n  No tracks found.\n"
+	}
+
+	track := m.tracks[m.filteredTracks[m.currentIndex]]
+	
+	// Update systray
+	if m.ctrl != nil && m.ctrl.Paused {
+		systray.SetTitle("⏸ " + track.Title)
+	} else {
+		systray.SetTitle("▶️ " + track.Title)
 	}
 
 	var percent float64

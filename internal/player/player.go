@@ -15,6 +15,7 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/dhowden/tag"
+	"github.com/getlantern/systray"
 )
 
 func Run(path string, shuffleFlag bool, loopFlag bool) {
@@ -159,10 +160,20 @@ func Run(path string, shuffleFlag bool, loopFlag bool) {
 	m.addInput.Placeholder = "Enter YouTube search (e.g. yt: em cua ngay hom qua) or URL"
 	m.addInput.Prompt = ""
 
-	if _, err := tea.NewProgram(m).Run(); err != nil {
-		fmt.Printf("Error running program: %v", err)
-		os.Exit(1)
-	}
+	go func() {
+		if _, err := tea.NewProgram(m).Run(); err != nil {
+			fmt.Printf("Error running program: %v", err)
+			os.Exit(1)
+		}
+		systray.Quit()
+	}()
+
+	systray.Run(func() {
+		systray.SetTitle("🎵 Audio CLI")
+		systray.SetTooltip("Audio CLI Player")
+	}, func() {
+		os.Exit(0)
+	})
 }
 
 func (m model) Init() tea.Cmd {
