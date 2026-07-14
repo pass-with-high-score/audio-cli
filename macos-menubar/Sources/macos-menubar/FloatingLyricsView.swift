@@ -153,17 +153,7 @@ struct FloatingLyricsView: View {
                     if !state.isLeft { infoText }
                     
                     if state.status.thumbnail != "" {
-                        AsyncImage(url: URL(string: state.status.thumbnail)) { phase in
-                            if let image = phase.image {
-                                image.resizable().aspectRatio(contentMode: .fill)
-                            } else {
-                                ZStack {
-                                    Color.white.opacity(0.1)
-                                    Image(systemName: "music.note")
-                                        .foregroundColor(.white.opacity(0.5))
-                                }
-                            }
-                        }.frame(width: 40, height: 40).cornerRadius(6)
+                        SpinningVinylView(imageURL: state.status.thumbnail, isPlaying: !state.status.paused)
                     } else {
                         Image(systemName: "music.note.list")
                             .font(.system(size: 20))
@@ -211,7 +201,7 @@ struct FloatingLyricsView: View {
                 }
             )
             .shadow(color: .black.opacity(0.15), radius: 10, x: 0, y: 4)
-            .overlay(OnekoView())
+            .overlay(OnekoView(state: state))
             .onHover { hovering in
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                     isHovering = hovering
@@ -263,6 +253,40 @@ struct FloatingLyricsView: View {
                 }
             }
             .padding(.top, 2)
+        }
+    }
+}
+
+struct SpinningVinylView: View {
+    var imageURL: String
+    var isPlaying: Bool
+    
+    @State private var rotation: Double = 0
+    let timer = Timer.publish(every: 0.05, on: .main, in: .common).autoconnect()
+    
+    var body: some View {
+        AsyncImage(url: URL(string: imageURL)) { phase in
+            if let image = phase.image {
+                image.resizable().aspectRatio(contentMode: .fill)
+            } else {
+                ZStack {
+                    Color.white.opacity(0.1)
+                    Image(systemName: "music.note")
+                        .foregroundColor(.white.opacity(0.5))
+                }
+            }
+        }
+        .frame(width: 40, height: 40)
+        .clipShape(Circle())
+        .overlay(Circle().stroke(Color.black.opacity(0.7), lineWidth: 4))
+        .overlay(Circle().fill(Color.black.opacity(0.8)).frame(width: 12, height: 12))
+        .overlay(Circle().stroke(Color.white.opacity(0.2), lineWidth: 0.5))
+        .shadow(color: .black.opacity(0.4), radius: 3, x: 0, y: 2)
+        .rotationEffect(.degrees(rotation))
+        .onReceive(timer) { _ in
+            if isPlaying {
+                rotation += 2.0
+            }
         }
     }
 }

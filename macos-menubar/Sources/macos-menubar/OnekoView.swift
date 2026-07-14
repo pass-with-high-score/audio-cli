@@ -3,12 +3,14 @@ import SwiftUI
 import MediaPlayer
 
 struct OnekoView: View {
+    @ObservedObject var state: AppState
     @State private var catPos: CGPoint = CGPoint(x: -16, y: -16)
     @State private var direction: Direction = .right
     @State private var sleepTick = 50
     @State private var tickCounter = 0
     @State private var frameNo = 25
     @State private var surpriseTick = 0
+    @State private var showHeart = false
     
     enum Direction { case right, down, left, up }
     
@@ -22,15 +24,29 @@ struct OnekoView: View {
                     Image(nsImage: nsImage)
                         .resizable()
                         .frame(width: 32, height: 32)
-                        .position(catPos)
                         .shadow(color: .black.opacity(0.3), radius: 2)
+                        .overlay(
+                            Text("❤️")
+                                .font(.system(size: 16))
+                                .opacity(showHeart ? 1 : 0)
+                                .offset(y: showHeart ? -30 : -10)
+                        )
+                        .onTapGesture {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.5)) {
+                                showHeart = true
+                            }
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                                withAnimation { showHeart = false }
+                            }
+                            surpriseTick = 5
+                        }
+                        .position(catPos)
                 }
             }
             .onReceive(timer) { _ in
                 updateCat(size: geo.size)
             }
         }
-        .allowsHitTesting(false)
     }
     
     func updateCat(size: CGSize) {
@@ -40,6 +56,18 @@ struct OnekoView: View {
             surpriseTick -= 1
             frameNo = 32
             return
+        }
+        
+        if showHeart {
+            frameNo = 32 // stop and stare
+            return
+        }
+        
+        if state.status.paused {
+            if sleepTick < 10 { sleepTick = 100 }
+        } else if sleepTick > 0 {
+            sleepTick = 0
+            surpriseTick = 3
         }
         
         if sleepTick > 0 {
