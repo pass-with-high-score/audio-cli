@@ -289,75 +289,105 @@ struct PopoverView: View {
 }
 
 struct OnekoView: View {
-    @State private var catPos: CGFloat = 0
-    @State private var movingRight = true
+    @State private var catPos: CGPoint = CGPoint(x: -16, y: -16)
+    @State private var direction: Direction = .right
     @State private var sleepTick = 50
     @State private var tickCounter = 0
     @State private var frameNo = 25
     @State private var surpriseTick = 0
     
-    let timer = Timer.publish(every: 0.15, on: .main, in: .common).autoconnect()
+    enum Direction { case right, down, left, up }
+    
+    let timer = Timer.publish(every: 0.25, on: .main, in: .common).autoconnect()
     
     var body: some View {
-        ZStack(alignment: .bottomLeading) {
-            if let url = Bundle.module.url(forResource: "\(frameNo)", withExtension: "gif"),
-               let nsImage = NSImage(contentsOf: url) {
-                Image(nsImage: nsImage)
-                    .resizable()
-                    .frame(width: 32, height: 32)
-                    .offset(x: catPos)
-                    .shadow(color: .black.opacity(0.3), radius: 2)
+        GeometryReader { geo in
+            ZStack {
+                if let url = Bundle.module.url(forResource: "\(frameNo)", withExtension: "gif"),
+                   let nsImage = NSImage(contentsOf: url) {
+                    Image(nsImage: nsImage)
+                        .resizable()
+                        .frame(width: 32, height: 32)
+                        .position(catPos)
+                        .shadow(color: .black.opacity(0.3), radius: 2)
+                }
             }
-        }
-        .frame(width: 120, height: 32, alignment: .leading)
-        .onReceive(timer) { _ in
-            tickCounter += 1
-            
-            if surpriseTick > 0 {
-                surpriseTick -= 1
-                frameNo = 32
-                return
-            }
-            
-            if sleepTick > 0 {
-                sleepTick -= 1
-                if sleepTick > 40 {
-                    frameNo = (tickCounter % 2 == 0) ? 31 : 25 // lick
-                } else if sleepTick > 20 {
-                    frameNo = (tickCounter % 2 == 0) ? 27 : 28 // scratch
-                } else if sleepTick > 15 {
-                    frameNo = 26 // yawn
-                } else {
-                    frameNo = (tickCounter % 4 < 2) ? 29 : 30 // sleep
-                }
-                
-                if sleepTick == 0 {
-                    surpriseTick = 4
-                }
-                return
-            }
-            
-            if movingRight {
-                frameNo = (frameNo == 5) ? 6 : 5 // Right frames
-                catPos += 5
-                if catPos > 120 - 32 {
-                    movingRight = false
-                    if Int.random(in: 0...2) == 0 {
-                        sleepTick = 60
-                    }
-                }
-            } else {
-                frameNo = (frameNo == 13) ? 14 : 13 // Left frames
-                catPos -= 5
-                if catPos < 0 {
-                    movingRight = true
-                    if Int.random(in: 0...2) == 0 {
-                        sleepTick = 60
-                    }
-                }
+            .onReceive(timer) { _ in
+                updateCat(size: geo.size)
             }
         }
         .allowsHitTesting(false)
+    }
+    
+    func updateCat(size: CGSize) {
+        tickCounter += 1
+        
+        if surpriseTick > 0 {
+            surpriseTick -= 1
+            frameNo = 32
+            return
+        }
+        
+        if sleepTick > 0 {
+            sleepTick -= 1
+            if sleepTick > 40 {
+                frameNo = (tickCounter % 2 == 0) ? 31 : 25 // lick
+            } else if sleepTick > 20 {
+                frameNo = (tickCounter % 2 == 0) ? 27 : 28 // scratch
+            } else if sleepTick > 15 {
+                frameNo = 26 // yawn
+            } else {
+                frameNo = (tickCounter % 4 < 2) ? 29 : 30 // sleep
+            }
+            
+            if sleepTick == 0 {
+                surpriseTick = 4
+            }
+            return
+        }
+        
+        let speed: CGFloat = 8
+        
+        switch direction {
+        case .right:
+            frameNo = (frameNo == 5) ? 6 : 5 // Right frames
+            catPos.x += speed
+            if catPos.x >= size.width + 16 {
+                catPos.x = size.width + 16
+                direction = .down
+                maybeSleep()
+            }
+        case .down:
+            frameNo = (frameNo == 9) ? 10 : 9 // Down frames
+            catPos.y += speed
+            if catPos.y >= size.height + 16 {
+                catPos.y = size.height + 16
+                direction = .left
+                maybeSleep()
+            }
+        case .left:
+            frameNo = (frameNo == 13) ? 14 : 13 // Left frames
+            catPos.x -= speed
+            if catPos.x <= -16 {
+                catPos.x = -16
+                direction = .up
+                maybeSleep()
+            }
+        case .up:
+            frameNo = (frameNo == 1) ? 2 : 1 // Up frames
+            catPos.y -= speed
+            if catPos.y <= -16 {
+                catPos.y = -16
+                direction = .right
+                maybeSleep()
+            }
+        }
+    }
+    
+    func maybeSleep() {
+        if Int.random(in: 0...3) == 0 {
+            sleepTick = 40
+        }
     }
 }
 
@@ -509,6 +539,7 @@ struct FloatingLyricsView: View {
             .padding(12)
             .background(VisualEffectView().cornerRadius(12).opacity(0.9))
             .shadow(color: .black.opacity(0.5), radius: 5, x: 0, y: 2)
+            .overlay(OnekoView())
         }
     }
     
@@ -525,10 +556,6 @@ struct FloatingLyricsView: View {
                     .foregroundColor(.white.opacity(0.8))
                     .lineLimit(1)
             }
-            
-            OnekoView() // The cat walking above the progress bar!
-                .padding(.top, 2)
-                .padding(.bottom, -8) // Pull it closer to the progress bar
             
             HStack(spacing: 6) {
                 Text(state.formatTime(state.status.position))
