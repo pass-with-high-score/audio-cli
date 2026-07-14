@@ -157,7 +157,7 @@ struct PopoverView: View {
                 }, set: { val in
                     state.status.volume = val
                     state.setVolume(val)
-                }), in: 0...5)
+                }), in: 0...1)
                 .controlSize(.mini)
                 Image(systemName: "speaker.wave.3.fill").foregroundColor(.secondary).font(.caption2)
             }

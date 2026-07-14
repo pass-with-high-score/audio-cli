@@ -3,6 +3,7 @@ package player
 import (
 	"bytes"
 	"fmt"
+	"math"
 	"os/exec"
 	"path/filepath"
 	"strconv"
@@ -333,10 +334,17 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case volMsg:
 		if m.volume != nil {
-			if vol, err := strconv.ParseFloat(msg.vol, 64); err == nil {
+			if volLinear, err := strconv.ParseFloat(msg.vol, 64); err == nil {
 				speaker.Lock()
-				m.volume.Volume = vol
-				m.config.Volume = vol
+				if volLinear <= 0.01 {
+					m.volume.Silent = true
+				} else {
+					m.volume.Silent = false
+					// Map linear 0.0 - 1.0 to beep's logarithmic Volume (Base 2)
+					// Base^Volume = volLinear => Volume = log2(volLinear)
+					m.volume.Volume = math.Log2(volLinear)
+				}
+				m.config.Volume = volLinear
 				speaker.Unlock()
 				go saveConfig(m.config)
 			}
