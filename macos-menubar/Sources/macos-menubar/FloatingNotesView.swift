@@ -27,6 +27,7 @@ struct FloatingNotesView: View {
                     Image(systemName: note.symbol)
                         .font(.system(size: 14))
                         .foregroundColor(note.color.opacity(0.8))
+                        .shadow(color: .black.opacity(0.3), radius: 1, x: 0, y: 1)
                         .scaleEffect(note.scale)
                         .position(x: note.x, y: note.y)
                         .opacity(note.opacity)

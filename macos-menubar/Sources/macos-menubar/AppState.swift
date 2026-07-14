@@ -507,7 +507,13 @@ class AppState: ObservableObject {
         guard let url = URL(string: imageURL) else { return }
         Task {
             do {
-                let (data, _) = try await URLSession.shared.data(from: url)
+                let data: Data
+                if imageURL.hasPrefix("file://") {
+                    data = try Data(contentsOf: url)
+                } else {
+                    let (d, _) = try await URLSession.shared.data(from: url)
+                    data = d
+                }
                 guard let nsImage = NSImage(data: data),
                       let cgImage = nsImage.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return }
 
@@ -525,7 +531,9 @@ class AppState: ObservableObject {
                 DispatchQueue.main.async {
                     self.dominantColor = color
                 }
-            } catch {}
+            } catch {
+                print("Failed to extract dominant color: \(error)")
+            }
         }
     }
 
