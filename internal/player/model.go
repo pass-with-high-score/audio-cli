@@ -56,6 +56,7 @@ type model struct {
 	shuffle        bool
 	err            error
 	initialized    bool
+	initRate       beep.SampleRate
 	width          int
 	pointA         int
 	pointB         int

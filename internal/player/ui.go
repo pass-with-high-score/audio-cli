@@ -59,6 +59,28 @@ func (g *autoGain) Err() error {
 	return g.streamer.Err()
 }
 
+type limiter struct {
+	streamer beep.Streamer
+}
+
+func (l *limiter) Stream(samples [][2]float64) (n int, ok bool) {
+	n, ok = l.streamer.Stream(samples)
+	for i := 0; i < n; i++ {
+		for ch := 0; ch < 2; ch++ {
+			if samples[i][ch] > 0.99 {
+				samples[i][ch] = 0.99
+			} else if samples[i][ch] < -0.99 {
+				samples[i][ch] = -0.99
+			}
+		}
+	}
+	return n, ok
+}
+
+func (l *limiter) Err() error {
+	return l.streamer.Err()
+}
+
 func createEQ(base beep.Streamer, sampleRate beep.SampleRate, cfg Config) beep.Streamer {
 	var sections effects.MonoEqualizerSections
 	
@@ -99,6 +121,20 @@ func createEQ(base beep.Streamer, sampleRate beep.SampleRate, cfg Config) beep.S
 	}
 	
 	return effects.NewEqualizer(eqStreamer, sampleRate, sections)
+}
+
+func (m *model) updateStreamer() {
+	if m.volume == nil || m.visualizer == nil {
+		return
+	}
+	eq := createEQ(m.volume, m.format.SampleRate, m.config)
+	limitedEq := &limiter{streamer: eq}
+	
+	var finalStreamer beep.Streamer = limitedEq
+	if m.format.SampleRate != m.initRate && m.initialized {
+		finalStreamer = beep.Resample(4, m.format.SampleRate, m.initRate, limitedEq)
+	}
+	m.visualizer.streamer = finalStreamer
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -154,14 +190,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.ctrl = &beep.Ctrl{Streamer: m.streamer, Paused: false}
 		m.volume = &effects.Volume{Streamer: m.ctrl, Base: 2, Volume: m.config.Volume, Silent: false}
 		
-		eq := createEQ(m.volume, m.format.SampleRate, m.config)
-
-		m.visualizer = &Visualizer{streamer: eq}
-
+		m.visualizer = &Visualizer{} // initialized empty to satisfy updateStreamer
+		
 		if !m.initialized {
 			speaker.Init(m.format.SampleRate, m.format.SampleRate.N(time.Second/10))
+			m.initRate = m.format.SampleRate
 			m.initialized = true
 		}
+
+		m.updateStreamer()
 
 		speaker.Clear()
 		speaker.Play(m.visualizer)
@@ -221,8 +258,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				case "9": m.config.Band12k -= 1
 				case "0": m.config.Band12k += 1
 				}
-				eq := createEQ(m.volume, m.format.SampleRate, m.config)
-				m.visualizer.streamer = eq
+				m.updateStreamer()
 				speaker.Unlock()
 				go saveConfig(m.config)
 			}
@@ -237,8 +273,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.config.Band4k = 0
 				m.config.Band12k = 0
 				
-				eq := createEQ(m.volume, m.format.SampleRate, m.config)
-				m.visualizer.streamer = eq
+				m.updateStreamer()
 				speaker.Unlock()
 				go saveConfig(m.config)
 			}
