@@ -28,10 +28,21 @@ class FloatingLyricsWindow: NSWindow {
         guard let initial = initialLocation else { return }
         let screenLocation = NSEvent.mouseLocation
         self.setFrameOrigin(NSPoint(x: screenLocation.x - initial.x, y: screenLocation.y - initial.y))
+        
+        let dx = event.deltaX
+        let dy = event.deltaY
+        DispatchQueue.main.async {
+            self.state?.dragVelocity = CGSize(width: dx, height: dy)
+        }
     }
     
     override func mouseUp(with event: NSEvent) {
         snapToCorner()
+        DispatchQueue.main.async {
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.6)) {
+                self.state?.dragVelocity = .zero
+            }
+        }
     }
     
     func snapToCorner() {
@@ -79,54 +90,58 @@ struct FloatingLyricsView: View {
 
     var body: some View {
         VStack(alignment: state.isLeft ? .leading : .trailing, spacing: 12) {
-            if state.isTop {
+            if state.isMiniMode {
                 songInfo
-                Spacer().frame(height: 10)
-                lyricsContent
             } else {
-                lyricsContent
-                Spacer().frame(height: 10)
-                songInfo
+                if state.isTop {
+                    songInfo
+                    Spacer().frame(height: 10)
+                    lyricsContent
+                } else {
+                    lyricsContent
+                    Spacer().frame(height: 10)
+                    songInfo
+                }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: alignment)
         .padding(40)
+        .rotation3DEffect(.degrees(state.dragVelocity.width * 0.5), axis: (x: 0, y: 1, z: 0))
+        .rotation3DEffect(.degrees(-state.dragVelocity.height * 0.5), axis: (x: 1, y: 0, z: 0))
         .animation(.spring(response: 0.4, dampingFraction: 0.8), value: state.currentLyricIndex)
         .animation(.easeInOut(duration: 0.4), value: state.isTop)
         .animation(.easeInOut(duration: 0.4), value: state.isLeft)
+        .animation(.spring(response: 0.4, dampingFraction: 0.7), value: state.isMiniMode)
     }
     
     @ViewBuilder
     var lyricsContent: some View {
         if !state.lyrics.isEmpty && state.currentLyricIndex >= 0 {
-            if state.currentLyricIndex - 1 >= 0 {
-                Text(state.lyrics[state.currentLyricIndex - 1].text)
-                    .font(.system(size: 24, weight: .semibold, design: .rounded))
-                    .foregroundColor(.white.opacity(0.4))
-                    .shadow(color: .black.opacity(0.8), radius: 2, x: 0, y: 2)
-                    .multilineTextAlignment(state.isLeft ? .leading : .trailing)
-                    .lineLimit(1)
+            VStack(alignment: state.isLeft ? .leading : .trailing, spacing: 10) {
+                lyricLine(offset: -2)
+                lyricLine(offset: -1)
+                lyricLine(offset: 0)
+                lyricLine(offset: 1)
+                lyricLine(offset: 2)
             }
-            
-            if state.currentLyricIndex < state.lyrics.count {
-                Text(state.lyrics[state.currentLyricIndex].text)
-                    .font(.system(size: 36, weight: .black, design: .rounded))
-                    .foregroundColor(.white)
-                    .shadow(color: state.dominantColor.opacity(0.8), radius: 10, x: 0, y: 0)
-                    .multilineTextAlignment(state.isLeft ? .leading : .trailing)
-                    .lineLimit(2)
-                    .id(state.lyrics[state.currentLyricIndex].id)
-                    .transition(.opacity.combined(with: .move(edge: state.isTop ? .top : .bottom)))
-            }
-            
-            if state.currentLyricIndex + 1 < state.lyrics.count {
-                Text(state.lyrics[state.currentLyricIndex + 1].text)
-                    .font(.system(size: 24, weight: .semibold, design: .rounded))
-                    .foregroundColor(.white.opacity(0.4))
-                    .shadow(color: .black.opacity(0.8), radius: 2, x: 0, y: 2)
-                    .multilineTextAlignment(state.isLeft ? .leading : .trailing)
-                    .lineLimit(1)
-            }
+        }
+    }
+    
+    @ViewBuilder
+    func lyricLine(offset: Int) -> some View {
+        let i = state.currentLyricIndex + offset
+        if i >= 0 && i < state.lyrics.count {
+            let distance = abs(offset)
+            Text(state.lyrics[i].text)
+                .font(.system(size: distance == 0 ? 36 : 24, weight: distance == 0 ? .black : .semibold, design: .rounded))
+                .foregroundColor(.white)
+                .opacity(distance == 0 ? 1.0 : (distance == 1 ? 0.4 : 0.1))
+                .shadow(color: distance == 0 ? state.dominantColor.opacity(0.8) : .black.opacity(0.5), radius: distance == 0 ? 10 : 2, x: 0, y: distance == 0 ? 0 : 2)
+                .blur(radius: distance == 0 ? 0 : CGFloat(distance) * 1.5)
+                .multilineTextAlignment(state.isLeft ? .leading : .trailing)
+                .lineLimit(distance == 0 ? 2 : 1)
+                .id(state.lyrics[i].id)
+                .transition(.opacity.combined(with: .move(edge: offset < 0 ? .top : .bottom)))
         }
     }
     
@@ -191,6 +206,11 @@ struct FloatingLyricsView: View {
             .onHover { hovering in
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                     isHovering = hovering
+                }
+            }
+            .onTapGesture(count: 2) {
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+                    state.isMiniMode.toggle()
                 }
             }
         }

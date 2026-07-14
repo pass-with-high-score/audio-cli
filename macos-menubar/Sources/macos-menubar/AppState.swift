@@ -11,6 +11,8 @@ class AppState: ObservableObject {
     @Published var isTop: Bool = false
     @Published var isLeft: Bool = true
     @Published var dominantColor: Color = .white
+    @Published var dragVelocity: CGSize = .zero
+    @Published var isMiniMode: Bool = false
     var lastSearchedTitle: String = ""
     var lastThumbnail: String = ""
     var timer: Timer?
