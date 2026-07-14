@@ -2,6 +2,12 @@ import Cocoa
 import SwiftUI
 import MediaPlayer
 
+enum RepeatMode {
+    case off    // no repeat
+    case one    // repeat current track
+    case all    // repeat entire queue
+}
+
 struct LyricLine: Identifiable {
     let id = UUID()
     let time: Double

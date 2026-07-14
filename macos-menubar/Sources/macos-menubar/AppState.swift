@@ -2,6 +2,7 @@ import Cocoa
 import SwiftUI
 import MediaPlayer
 import CoreImage
+
 enum EasterEgg {
     case hyperSpeed
     case reverseSpin
@@ -12,7 +13,7 @@ enum EasterEgg {
 
 @MainActor
 class AppState: ObservableObject {
-    @Published var status = TrackStatus(title: "Loading...", artist: "", thumbnail: "", paused: false, volume: 1.0, percent: 0, position: 0, duration: 0)
+    @Published var status = TrackStatus(title: "No track", artist: "", thumbnail: "", paused: true, volume: 1.0, percent: 0, position: 0, duration: 0)
     @Published var lyrics: [LyricLine] = []
     @Published var currentLyricIndex: Int = -1
     @Published var isTop: Bool = false
@@ -21,105 +22,283 @@ class AppState: ObservableObject {
     @Published var dragVelocity: CGSize = .zero
     @Published var isMiniMode: Bool = false
     @Published var currentEasterEgg: EasterEgg? = nil
+    
+    @Published var isShuffled: Bool = false
+    @Published var repeatMode: RepeatMode = .off
+
+    let ytdlp = YtDlpService()
+    let audioPlayer = AudioPlayerService()
+    var tracks: [TrackInfo] = []
+    var currentTrackIndex: Int = -1
+
     var lastSearchedTitle: String = ""
     var lastThumbnail: String = ""
     var timer: Timer?
-    
+
     init() {
         setupRemoteTransportControls()
-        timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+
+        audioPlayer.onTrackFinished = { [weak self] in
             Task { @MainActor in
-                self?.fetch()
+                self?.playNext()
             }
         }
-        fetch()
-    }
-    
-    func fetch() {
-        guard let url = URL(string: "http://localhost:13337/status") else { return }
+
+        timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                self?.updateFromPlayer()
+            }
+        }
+
+        // Auto-download yt-dlp binary on first launch
         Task {
-            do {
-                let (data, _) = try await URLSession.shared.data(from: url)
-                if let s = try? JSONDecoder().decode(TrackStatus.self, from: data) {
-                    self.status = s
-                    self.updateNowPlaying()
-                    self.updateCurrentLyric()
-                    if s.title != self.lastSearchedTitle && s.title != "Loading..." {
-                        self.lastSearchedTitle = s.title
-                        self.fetchLyrics(for: s.title)
-                    }
-                    if s.thumbnail != self.lastThumbnail && s.thumbnail != "" {
-                        self.lastThumbnail = s.thumbnail
-                        self.extractDominantColor(from: s.thumbnail)
-                    }
-                }
-            } catch {}
+            await ytdlp.ensureBinary()
         }
     }
-    
+
+    // MARK: - Player State Sync
+
+    private func updateFromPlayer() {
+        status.position = audioPlayer.currentTime
+        status.duration = audioPlayer.duration
+        status.paused = !audioPlayer.isPlaying
+        status.volume = Double(audioPlayer.volume)
+
+        if status.duration > 0 {
+            status.percent = (status.position / status.duration) * 100.0
+        } else {
+            status.percent = 0
+        }
+
+        updateCurrentLyric()
+        updateNowPlaying()
+    }
+
+    private func updateStatus() {
+        status.position = audioPlayer.currentTime
+        status.duration = audioPlayer.duration
+        status.paused = !audioPlayer.isPlaying
+        status.volume = Double(audioPlayer.volume)
+
+        if status.duration > 0 {
+            status.percent = (status.position / status.duration) * 100.0
+        } else {
+            status.percent = 0
+        }
+    }
+
+    // MARK: - Controls (post() kept for view compatibility)
+
     func post(_ endpoint: String) {
-        guard let url = URL(string: "http://localhost:13337/\(endpoint)") else { return }
-        var req = URLRequest(url: url)
-        req.httpMethod = "POST"
-        Task {
-            do {
-                _ = try await URLSession.shared.data(for: req)
-                try await Task.sleep(nanoseconds: 200_000_000)
-                self.fetch()
-            } catch {}
+        switch endpoint {
+        case "playpause":
+            audioPlayer.togglePlayPause()
+            updateStatus()
+        case "next":
+            playNext()
+        case "prev":
+            playPrev()
+        case "shuffle":
+            toggleShuffle()
+        case "repeat":
+            cycleRepeatMode()
+        default:
+            break
+        }
+    }
+
+    func seek(to pos: Double) {
+        audioPlayer.seek(to: pos)
+        status.position = pos
+    }
+
+    func setVolume(_ vol: Double) {
+        audioPlayer.setVolume(Float(vol))
+        status.volume = vol
+    }
+
+    // MARK: - Track Management
+    
+    func toggleShuffle() {
+        isShuffled.toggle()
+    }
+    
+    func cycleRepeatMode() {
+        switch repeatMode {
+        case .off: repeatMode = .one
+        case .one: repeatMode = .all
+        case .all: repeatMode = .off
         }
     }
     
-    func seek(to pos: Double) {
-        guard let url = URL(string: "http://localhost:13337/seek?pos=\(pos)") else { return }
-        var req = URLRequest(url: url)
-        req.httpMethod = "POST"
-        Task { _ = try? await URLSession.shared.data(for: req) }
+    func removeTrack(at index: Int) {
+        guard index >= 0 && index < tracks.count else { return }
+        tracks.remove(at: index)
+        if index == currentTrackIndex {
+            if tracks.isEmpty {
+                currentTrackIndex = -1
+                audioPlayer.stop()
+                status.title = "No track"
+                status.artist = ""
+                status.thumbnail = ""
+                status.paused = true
+            } else {
+                currentTrackIndex = min(currentTrackIndex, tracks.count - 1)
+                Task { await playCurrentTrack() }
+            }
+        } else if index < currentTrackIndex {
+            currentTrackIndex -= 1
+        }
     }
-    
-    func setVolume(_ vol: Double) {
-        guard let url = URL(string: "http://localhost:13337/volume?vol=\(vol)") else { return }
-        var req = URLRequest(url: url)
-        req.httpMethod = "POST"
-        Task { _ = try? await URLSession.shared.data(for: req) }
-    }
-    
+
     func addTrack(query: String) {
-        guard let encoded = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
-              let url = URL(string: "http://localhost:13337/add?q=\(encoded)") else { return }
-        var req = URLRequest(url: url)
-        req.httpMethod = "POST"
-        Task { _ = try? await URLSession.shared.data(for: req) }
+        status.searchStatus = "Searching YouTube..."
+        Task {
+            do {
+                let trackInfo = try await ytdlp.search(query: query)
+                tracks.append(trackInfo)
+                status.searchStatus = "Downloading audio..."
+                let _ = try await ytdlp.downloadAudio(from: trackInfo.url)
+                status.searchStatus = ""
+                // If nothing playing, play immediately
+                if currentTrackIndex < 0 || !audioPlayer.isPlaying {
+                    currentTrackIndex = tracks.count - 1
+                    await playCurrentTrack()
+                }
+            } catch {
+                status.searchStatus = "Error: \(error.localizedDescription)"
+                // Clear error after 3 seconds
+                try? await Task.sleep(nanoseconds: 3_000_000_000)
+                status.searchStatus = ""
+            }
+        }
     }
-    
-    func quitBackend() {
-        guard let url = URL(string: "http://localhost:13337/quit") else { return }
-        var req = URLRequest(url: url)
-        req.httpMethod = "POST"
-        Task { _ = try? await URLSession.shared.data(for: req) }
+
+    func playCurrentTrack() async {
+        guard currentTrackIndex >= 0 && currentTrackIndex < tracks.count else { return }
+        let track = tracks[currentTrackIndex]
+
+        status.title = track.title
+        status.artist = track.artist
+        status.thumbnail = track.thumbnailURL
+        status.position = 0
+        status.duration = 0
+        status.percent = 0
+
+        // Fetch lyrics for new track
+        if track.title != lastSearchedTitle {
+            lastSearchedTitle = track.title
+            fetchLyrics(for: track.title)
+        }
+
+        // Extract dominant color from thumbnail
+        if track.thumbnailURL != lastThumbnail && !track.thumbnailURL.isEmpty {
+            lastThumbnail = track.thumbnailURL
+            extractDominantColor(from: track.thumbnailURL)
+        }
+
+        do {
+            // Download audio if not already cached
+            let localPath = try await ytdlp.downloadAudio(from: track.url)
+            audioPlayer.play(fileURL: localPath)
+            updateStatus()
+        } catch {
+            status.searchStatus = "Playback error: \(error.localizedDescription)"
+            try? await Task.sleep(nanoseconds: 3_000_000_000)
+            status.searchStatus = ""
+        }
     }
-    
+
+    func playNext() {
+        guard !tracks.isEmpty else { return }
+        if repeatMode == .one {
+            Task { await playCurrentTrack() }
+            return
+        }
+        if isShuffled {
+            var nextIndex = Int.random(in: 0..<tracks.count)
+            if tracks.count > 1 {
+                while nextIndex == currentTrackIndex {
+                    nextIndex = Int.random(in: 0..<tracks.count)
+                }
+            }
+            currentTrackIndex = nextIndex
+        } else {
+            currentTrackIndex += 1
+            if currentTrackIndex >= tracks.count {
+                if repeatMode == .all {
+                    currentTrackIndex = 0
+                } else {
+                    currentTrackIndex = tracks.count - 1
+                    audioPlayer.stop()
+                    status.paused = true
+                    return
+                }
+            }
+        }
+        Task { await playCurrentTrack() }
+    }
+
+    func playPrev() {
+        guard !tracks.isEmpty else { return }
+        if repeatMode == .one {
+            Task { await playCurrentTrack() }
+            return
+        }
+        if isShuffled {
+            var prevIndex = Int.random(in: 0..<tracks.count)
+            if tracks.count > 1 {
+                while prevIndex == currentTrackIndex {
+                    prevIndex = Int.random(in: 0..<tracks.count)
+                }
+            }
+            currentTrackIndex = prevIndex
+        } else {
+            currentTrackIndex -= 1
+            if currentTrackIndex < 0 {
+                if repeatMode == .all {
+                    currentTrackIndex = tracks.count - 1
+                } else {
+                    currentTrackIndex = 0
+                }
+            }
+        }
+        Task { await playCurrentTrack() }
+    }
+
+    // MARK: - Lyrics
+
     func fetchLyrics(for title: String) {
         let cleanTitle = title.components(separatedBy: "(")[0].components(separatedBy: "[")[0].trimmingCharacters(in: .whitespaces)
         guard let encoded = cleanTitle.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
               let url = URL(string: "https://lrclib.net/api/search?q=\(encoded)") else { return }
 
+        var request = URLRequest(url: url)
+        request.setValue("AudioCLI/1.0 (https://github.com/nqmgaming/audio-cli)", forHTTPHeaderField: "User-Agent")
+
         Task {
             do {
-                let (data, _) = try await URLSession.shared.data(from: url)
+                let (data, _) = try await URLSession.shared.data(for: request)
                 if let results = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]],
-                   let first = results.first,
-                   let syncedLyrics = first["syncedLyrics"] as? String {
-                    self.parseLRC(syncedLyrics)
+                   let first = results.first {
+                    print("Found LRC result: \(first["trackName"] ?? "")")
+                    if let syncedLyrics = first["syncedLyrics"] as? String {
+                        self.parseLRC(syncedLyrics)
+                    } else {
+                        print("No synced lyrics found")
+                        DispatchQueue.main.async { self.lyrics = [] }
+                    }
                 } else {
+                    print("No results from lrclib")
                     DispatchQueue.main.async { self.lyrics = [] }
                 }
             } catch {
+                print("LRC Error: \(error)")
                 DispatchQueue.main.async { self.lyrics = [] }
             }
         }
     }
-    
+
     func parseLRC(_ lrc: String) {
         var lines: [LyricLine] = []
         let regex = try! NSRegularExpression(pattern: "\\[(\\d{2}):(\\d{2})\\.(\\d{2,3})\\](.*)")
@@ -137,9 +316,10 @@ class AppState: ObservableObject {
                 lines.append(LyricLine(time: time, text: text))
             }
         }
+        print("Parsed \(lines.count) lyrics lines")
         DispatchQueue.main.async { self.lyrics = lines }
     }
-    
+
     func updateCurrentLyric() {
         let pos = status.position
         var bestIndex = -1
@@ -154,7 +334,9 @@ class AppState: ObservableObject {
             DispatchQueue.main.async { self.currentLyricIndex = bestIndex }
         }
     }
-    
+
+    // MARK: - Now Playing & Remote Controls
+
     func updateNowPlaying() {
         var nowPlayingInfo = [String: Any]()
         nowPlayingInfo[MPMediaItemPropertyTitle] = status.title
@@ -163,7 +345,7 @@ class AppState: ObservableObject {
         nowPlayingInfo[MPMediaItemPropertyPlaybackDuration] = status.duration
         nowPlayingInfo[MPNowPlayingInfoPropertyPlaybackRate] = status.paused ? 0.0 : 1.0
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nowPlayingInfo
-        
+
         DispatchQueue.main.async {
             if let delegate = NSApp.delegate as? AppDelegate, let button = delegate.statusItem?.button {
                 let iconName = self.status.paused ? "music.note" : "waveform"
@@ -171,7 +353,7 @@ class AppState: ObservableObject {
             }
         }
     }
-    
+
     func formatTime(_ seconds: Double) -> String {
         guard !seconds.isNaN && !seconds.isInfinite else { return "0:00" }
         let totalSeconds = Int(seconds)
@@ -179,27 +361,31 @@ class AppState: ObservableObject {
         let s = totalSeconds % 60
         return String(format: "%d:%02d", m, s)
     }
-    
+
     func setupRemoteTransportControls() {
         let commandCenter = MPRemoteCommandCenter.shared()
         commandCenter.playCommand.addTarget { [unowned self] event in
-            self.post("playpause")
+            self.audioPlayer.togglePlayPause()
+            self.updateStatus()
             return .success
         }
         commandCenter.pauseCommand.addTarget { [unowned self] event in
-            self.post("playpause")
+            self.audioPlayer.togglePlayPause()
+            self.updateStatus()
             return .success
         }
         commandCenter.nextTrackCommand.addTarget { [unowned self] event in
-            self.post("next")
+            self.playNext()
             return .success
         }
         commandCenter.previousTrackCommand.addTarget { [unowned self] event in
-            self.post("prev")
+            self.playPrev()
             return .success
         }
     }
-    
+
+    // MARK: - Visual
+
     func extractDominantColor(from imageURL: String) {
         guard let url = URL(string: imageURL) else { return }
         Task {
@@ -207,17 +393,17 @@ class AppState: ObservableObject {
                 let (data, _) = try await URLSession.shared.data(from: url)
                 guard let nsImage = NSImage(data: data),
                       let cgImage = nsImage.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return }
-                
+
                 let ciImage = CIImage(cgImage: cgImage)
                 let extentVector = CIVector(x: ciImage.extent.origin.x, y: ciImage.extent.origin.y, z: ciImage.extent.size.width, w: ciImage.extent.size.height)
-                
+
                 guard let filter = CIFilter(name: "CIAreaAverage", parameters: [kCIInputImageKey: ciImage, kCIInputExtentKey: extentVector]),
                       let outputImage = filter.outputImage else { return }
-                
+
                 var bitmap = [UInt8](repeating: 0, count: 4)
                 let context = CIContext(options: [.workingColorSpace: kCFNull!])
                 context.render(outputImage, toBitmap: &bitmap, rowBytes: 4, bounds: CGRect(x: 0, y: 0, width: 1, height: 1), format: .RGBA8, colorSpace: nil)
-                
+
                 let color = Color(red: Double(bitmap[0]) / 255.0, green: Double(bitmap[1]) / 255.0, blue: Double(bitmap[2]) / 255.0)
                 DispatchQueue.main.async {
                     self.dominantColor = color
@@ -225,12 +411,14 @@ class AppState: ObservableObject {
             } catch {}
         }
     }
-    
+
+    // MARK: - Easter Eggs
+
     func triggerRandomEasterEgg() {
         guard self.currentEasterEgg == nil else { return }
         let actions: [EasterEgg] = [.hyperSpeed, .reverseSpin, .raveMode, .djScratch, .windowBounce]
         self.currentEasterEgg = actions.randomElement()
-        
+
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
             withAnimation(.spring()) {
                 self.currentEasterEgg = nil

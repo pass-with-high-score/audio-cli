@@ -9,6 +9,7 @@ struct CustomSlider: View {
     
     @State private var isDragging = false
     @State private var dragValue: Double?
+    @State private var isHovering = false
     
     var body: some View {
         GeometryReader { geo in
@@ -16,15 +17,24 @@ struct CustomSlider: View {
             let percent = max(0, min(1, total > 0 ? displayValue / total : 0))
             ZStack(alignment: .leading) {
                 Capsule().fill(Color.primary.opacity(0.2)).frame(height: 4)
-                Capsule().fill(Color.primary).frame(width: geo.size.width * CGFloat(percent), height: 4)
+                Capsule().fill(Color.accentColor).frame(width: geo.size.width * CGFloat(percent), height: 4)
+                
+                let thumbSize: CGFloat = isDragging || isHovering ? 10 : 8
+                let thumbOffset: CGFloat = isDragging || isHovering ? 5 : 4
+                
                 Circle()
                     .fill(Color.primary)
-                    .frame(width: isDragging ? 10 : 8, height: isDragging ? 10 : 8)
-                    .offset(x: max(0, min(geo.size.width * CGFloat(percent) - (isDragging ? 5 : 4), geo.size.width - (isDragging ? 10 : 8))))
+                    .frame(width: thumbSize, height: thumbSize)
+                    .offset(x: max(0, min(geo.size.width * CGFloat(percent) - thumbOffset, geo.size.width - thumbSize)))
                     .shadow(color: .black.opacity(0.2), radius: 2)
             }
             .frame(height: 12, alignment: .center)
             .contentShape(Rectangle())
+            .onHover { hovering in
+                withAnimation(.easeInOut(duration: 0.1)) {
+                    isHovering = hovering
+                }
+            }
             .gesture(
                 DragGesture(minimumDistance: 0)
                     .onChanged { drag in

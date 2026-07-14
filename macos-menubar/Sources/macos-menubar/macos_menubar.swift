@@ -6,7 +6,7 @@ import MediaPlayer
 struct MenuBarApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     var body: some Scene {
-        Settings { EmptyView() }
+        Settings { SettingsView() }
     }
 }
 
@@ -16,14 +16,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var popover: NSPopover!
     let state = AppState()
     var floatingWindow: FloatingLyricsWindow!
-    var backendProcess: Process?
     
     func applicationWillFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        startBackend()
         let contentView = PopoverView(state: state)
         popover = NSPopover()
         popover.contentSize = NSSize(width: 260, height: 450)
@@ -42,8 +40,25 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         floatingWindow = FloatingLyricsWindow(contentRect: floatingRect, backing: .buffered, defer: false)
         floatingWindow.state = state
         floatingWindow.contentView = NSHostingView(rootView: floatingContentView)
-        floatingWindow.makeKeyAndOrderFront(nil)
-        floatingWindow.snapToCorner() // Initialize position
+        let showFloatingLyrics = UserDefaults.standard.bool(forKey: "showFloatingLyrics")
+        if showFloatingLyrics || UserDefaults.standard.object(forKey: "showFloatingLyrics") == nil {
+            floatingWindow.makeKeyAndOrderFront(nil)
+            floatingWindow.snapToCorner()
+        }
+        
+        NotificationCenter.default.addObserver(forName: NSNotification.Name("ToggleFloatingLyrics"), object: nil, queue: .main) { [weak self] notification in
+            let showVal = notification.object as? Bool
+            DispatchQueue.main.async {
+                if let show = showVal {
+                    if show {
+                        self?.floatingWindow.makeKeyAndOrderFront(nil)
+                        self?.floatingWindow.snapToCorner()
+                    } else {
+                        self?.floatingWindow.orderOut(nil)
+                    }
+                }
+            }
+        }
     }
     
     @objc func togglePopover(_ sender: AnyObject?) {
@@ -56,24 +71,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
     
-    func startBackend() {
-        let process = Process()
-        let audioCliPath = Bundle.main.url(forResource: "audio-cli", withExtension: nil)?.path 
-                           ?? FileManager.default.currentDirectoryPath + "/audio-cli"
-        process.executableURL = URL(fileURLWithPath: audioCliPath)
-        process.arguments = []
-        
-        do {
-            try process.run()
-            backendProcess = process
-            print("Backend started successfully")
-        } catch {
-            print("Failed to start backend: \(error)")
+    @objc func openSettings() {
+        if #available(macOS 13.0, *) {
+            NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+        } else {
+            NSApp.sendAction(Selector(("showPreferencesWindow:")), to: nil, from: nil)
         }
     }
     
-    func applicationWillTerminate(_ notification: Notification) {
-        state.quitBackend()
-        backendProcess?.terminate()
+    @objc func quitApp() {
+        NSApplication.shared.terminate(self)
     }
 }
