@@ -110,6 +110,8 @@ struct FloatingLyricsView: View {
         .padding(40)
         .rotation3DEffect(.degrees(state.dragVelocity.width * 0.5), axis: (x: 0, y: 1, z: 0))
         .rotation3DEffect(.degrees(-state.dragVelocity.height * 0.5), axis: (x: 1, y: 0, z: 0))
+        .offset(y: state.currentEasterEgg == .windowBounce ? -40 : 0)
+        .animation(state.currentEasterEgg == .windowBounce ? .interpolatingSpring(stiffness: 100, damping: 0) : .spring(), value: state.currentEasterEgg)
         .animation(.spring(response: 0.4, dampingFraction: 0.8), value: state.currentLyricIndex)
         .animation(.spring(response: 0.4, dampingFraction: 0.7), value: state.isMiniMode)
     }
@@ -199,6 +201,8 @@ struct FloatingLyricsView: View {
                     FloatingNotesView(isPlaying: !state.status.paused, dominantColor: state.dominantColor)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
+                .hueRotation(.degrees(state.currentEasterEgg == .raveMode ? 3600 : 0))
+                .animation(state.currentEasterEgg == .raveMode ? .linear(duration: 2) : .default, value: state.currentEasterEgg)
             )
             .shadow(color: .black.opacity(0.15), radius: 10, x: 0, y: 4)
             .overlay(OnekoView(state: state))
@@ -284,11 +288,15 @@ struct SpinningVinylView: View {
         .shadow(color: .black.opacity(0.4), radius: 3, x: 0, y: 2)
         .rotationEffect(.degrees(rotation))
         .onTapGesture {
-            state.triggerHyperSpeed()
+            state.triggerRandomEasterEgg()
         }
         .onReceive(timer) { _ in
             if !state.status.paused {
-                rotation += state.isHyperSpeed ? 50.0 : 2.0
+                var speed = 2.0
+                if state.currentEasterEgg == .hyperSpeed { speed = 50.0 }
+                if state.currentEasterEgg == .reverseSpin { speed = -30.0 }
+                if state.currentEasterEgg == .djScratch { speed = (Int.random(in: 0...1) == 0 ? 50.0 : -50.0) }
+                rotation += speed
             }
         }
     }

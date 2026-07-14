@@ -2,6 +2,13 @@ import Cocoa
 import SwiftUI
 import MediaPlayer
 import CoreImage
+enum EasterEgg {
+    case hyperSpeed
+    case reverseSpin
+    case raveMode
+    case djScratch
+    case windowBounce
+}
 
 @MainActor
 class AppState: ObservableObject {
@@ -13,7 +20,7 @@ class AppState: ObservableObject {
     @Published var dominantColor: Color = .white
     @Published var dragVelocity: CGSize = .zero
     @Published var isMiniMode: Bool = false
-    @Published var isHyperSpeed: Bool = false
+    @Published var currentEasterEgg: EasterEgg? = nil
     var lastSearchedTitle: String = ""
     var lastThumbnail: String = ""
     var timer: Timer?
@@ -204,10 +211,15 @@ class AppState: ObservableObject {
         }
     }
     
-    func triggerHyperSpeed() {
-        self.isHyperSpeed = true
+    func triggerRandomEasterEgg() {
+        guard self.currentEasterEgg == nil else { return }
+        let actions: [EasterEgg] = [.hyperSpeed, .reverseSpin, .raveMode, .djScratch, .windowBounce]
+        self.currentEasterEgg = actions.randomElement()
+        
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-            self.isHyperSpeed = false
+            withAnimation(.spring()) {
+                self.currentEasterEgg = nil
+            }
         }
     }
 }

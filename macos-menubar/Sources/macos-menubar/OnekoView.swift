@@ -45,7 +45,7 @@ struct OnekoView: View {
                 }
             }
             .onReceive(timer) { _ in
-                if state.isHyperSpeed {
+                if state.currentEasterEgg == .hyperSpeed || state.currentEasterEgg == .reverseSpin {
                     updateCat(size: geo.size, hyper: true)
                 } else {
                     normalTickCounter += 1
@@ -97,7 +97,10 @@ struct OnekoView: View {
             return
         }
         
-        let speed: CGFloat = hyper ? 30 : 4
+        var speed: CGFloat = 4
+        if hyper {
+            speed = state.currentEasterEgg == .reverseSpin ? -15 : 30
+        }
         
         switch direction {
         case .right:
