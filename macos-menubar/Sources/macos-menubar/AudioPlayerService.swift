@@ -20,6 +20,8 @@ final class AudioPlayerService: NSObject, ObservableObject {
         didSet { timePitch.rate = rate }
     }
     
+    @Published var currentOutputDeviceID: AudioDeviceID = 0
+    
     // MARK: Callback
 
     /// Called on the main actor when the current track finishes playing naturally.
@@ -264,6 +266,12 @@ final class AudioPlayerService: NSObject, ObservableObject {
     func setOutputDevice(id: AudioDeviceID) {
         guard let outputUnit = engine.outputNode.audioUnit else { return }
         var deviceID = id
+        
+        // Update the published state
+        Task { @MainActor in
+            self.currentOutputDeviceID = id
+        }
+        
         AudioUnitSetProperty(
             outputUnit,
             kAudioOutputUnitProperty_CurrentDevice,

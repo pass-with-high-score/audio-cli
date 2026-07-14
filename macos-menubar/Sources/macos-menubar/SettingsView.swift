@@ -194,7 +194,7 @@ struct SettingsView: View {
                         Text("Output Device").bold()
                         let devices = state.audioPlayer.getOutputDevices()
                         Picker("", selection: Binding(
-                            get: { return 0 },
+                            get: { return Int(state.audioPlayer.currentOutputDeviceID) },
                             set: { id in state.audioPlayer.setOutputDevice(id: UInt32(id)) }
                         )) {
                             Text("System Default").tag(0)
