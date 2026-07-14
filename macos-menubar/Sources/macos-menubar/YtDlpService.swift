@@ -85,13 +85,14 @@ final class YtDlpService: ObservableObject {
         let effectiveQuery = query.lowercased().hasPrefix("http") ? query : "ytsearch1:\(query)"
 
         let output = try await runYtDlp(arguments: [
+            "--no-warnings",
             "--extractor-args", "youtube:player_client=android",
-            "--print", "%(title)s|%(id)s|%(webpage_url)s|%(uploader)s",
+            "--print", "%(title)s\t%(id)s\t%(webpage_url)s\t%(uploader)s",
             effectiveQuery
         ])
 
         let line = output.trimmingCharacters(in: .whitespacesAndNewlines)
-        let parts = line.components(separatedBy: "|")
+        let parts = line.components(separatedBy: "\t")
         guard parts.count >= 4 else {
             throw YtDlpError.parseError("Unexpected output format: \(line)")
         }
@@ -127,6 +128,7 @@ final class YtDlpService: ObservableObject {
         }
 
         _ = try await runYtDlp(arguments: [
+            "--no-warnings",
             "--extractor-args", "youtube:player_client=android",
             "-x",
             "--audio-format", "mp3",
