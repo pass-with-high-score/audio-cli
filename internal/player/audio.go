@@ -36,7 +36,7 @@ func (m *model) loadSongCmd(index int) tea.Cmd {
 			if _, err := os.Stat(outFile); os.IsNotExist(err) {
 				ytDlpPath := getInternalYtDlpPath()
 				var stdout, stderr bytes.Buffer
-				cmd := exec.Command(ytDlpPath, "-x", "--audio-format", "mp3", "-o", outFile, track.Path)
+				cmd := exec.Command(ytDlpPath, "--extractor-args", "youtube:player_client=android", "-x", "--audio-format", "mp3", "-o", outFile, track.Path)
 				cmd.Stdout = &stdout
 				cmd.Stderr = &stderr
 				err := cmd.Run()
@@ -78,6 +78,7 @@ func (m *model) loadSongCmd(index int) tea.Cmd {
 }
 
 func (m *model) nextSong() (*model, tea.Cmd) {
+	m.err = nil
 	if len(m.filteredTracks) == 0 {
 		return m, nil
 	}
@@ -100,6 +101,7 @@ func (m *model) nextSong() (*model, tea.Cmd) {
 }
 
 func (m *model) prevSong() (*model, tea.Cmd) {
+	m.err = nil
 	if len(m.filteredTracks) == 0 {
 		return m, nil
 	}

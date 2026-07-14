@@ -72,7 +72,7 @@ func addTrackCmd(query string) tea.Cmd {
 		if strings.HasPrefix(query, "ytsearch1:") || strings.HasPrefix(query, "http") {
 			ytDlpPath := getInternalYtDlpPath()
 			var stdout, stderr bytes.Buffer
-			cmd := exec.Command(ytDlpPath, "--print", "%(title)s|%(id)s|%(url)s|%(uploader)s", query)
+			cmd := exec.Command(ytDlpPath, "--extractor-args", "youtube:player_client=android", "--print", "%(title)s|%(id)s|%(url)s|%(uploader)s", query)
 			cmd.Stdout = &stdout
 			cmd.Stderr = &stderr
 			if err := cmd.Run(); err != nil {
@@ -185,7 +185,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.loading = false
 		if msg.err != nil {
 			m.err = msg.err
-			return m, tea.Quit
+			return m, nil
 		}
 
 		if m.streamer != nil {
@@ -390,15 +390,8 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *model) View() string {
-	if m.err != nil {
-		return fmt.Sprintf("\n  Error: %v\n", m.err)
-	}
 	if m.quitting {
 		return "\n  Playlist finished. Goodbye!\n"
-	}
-
-	if m.loading {
-		return "\n  " + dimStyle.Render("Loading...") + "\n"
 	}
 
 	if len(m.filteredTracks) == 0 {
@@ -424,6 +417,10 @@ func (m *model) View() string {
 	}
 
 	s := "\n" + titleStyle.Render("AUDIO PLAYER") + "\n\n"
+	
+	if m.err != nil {
+		s += " ⚠️ " + lipgloss.NewStyle().Foreground(lipgloss.Color("#FF5555")).Render(fmt.Sprintf("Error: %v", m.err)) + "\n\n"
+	}
 	
 	if m.loading {
 		s += " ⏳ Loading track... (Downloading from YouTube if needed)\n\n"
