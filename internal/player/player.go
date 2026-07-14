@@ -159,7 +159,7 @@ func Run(path string, shuffleFlag bool, loopFlag bool) {
 	m.addInput.Placeholder = "Enter YouTube search (e.g. yt: em cua ngay hom qua) or URL"
 	m.addInput.Prompt = ""
 
-	p := tea.NewProgram(m)
+	p := tea.NewProgram(&m)
 	startAPI(p, &m)
 
 	if _, err := p.Run(); err != nil {
@@ -168,7 +168,7 @@ func Run(path string, shuffleFlag bool, loopFlag bool) {
 	}
 }
 
-func (m model) Init() tea.Cmd {
+func (m *model) Init() tea.Cmd {
 	return tea.Batch(tick(), m.loadSongCmd(m.currentIndex))
 }
 

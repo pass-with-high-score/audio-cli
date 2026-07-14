@@ -18,7 +18,7 @@ import (
 	"github.com/faiface/beep/wav"
 )
 
-func (m model) loadSongCmd(index int) tea.Cmd {
+func (m *model) loadSongCmd(index int) tea.Cmd {
 	return func() tea.Msg {
 		if index < 0 || index >= len(m.filteredTracks) {
 			return loadMsg{err: fmt.Errorf("invalid track index")}
@@ -77,7 +77,7 @@ func (m model) loadSongCmd(index int) tea.Cmd {
 	}
 }
 
-func (m model) nextSong() (model, tea.Cmd) {
+func (m *model) nextSong() (*model, tea.Cmd) {
 	if len(m.filteredTracks) == 0 {
 		return m, nil
 	}
@@ -99,7 +99,7 @@ func (m model) nextSong() (model, tea.Cmd) {
 	return m, m.loadSongCmd(m.currentIndex)
 }
 
-func (m model) prevSong() (model, tea.Cmd) {
+func (m *model) prevSong() (*model, tea.Cmd) {
 	if len(m.filteredTracks) == 0 {
 		return m, nil
 	}
