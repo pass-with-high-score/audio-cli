@@ -27,9 +27,14 @@ class AppState: ObservableObject {
     @Published var isTop: Bool = false
     @Published var isLeft: Bool = true
     var lastSearchedTitle: String = ""
+    var timer: Timer?
     
     init() {
         setupRemoteTransportControls()
+        timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+            self?.fetch()
+        }
+        fetch()
     }
     
     func fetch() {
@@ -181,7 +186,6 @@ class AppState: ObservableObject {
 
 struct PopoverView: View {
     @ObservedObject var state: AppState
-    let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
     
     var body: some View {
         VStack(spacing: 15) {
@@ -281,8 +285,6 @@ struct PopoverView: View {
         .padding(20)
         .frame(width: 260, height: state.lyrics.isEmpty ? 350 : 450)
         .background(VisualEffectView().edgesIgnoringSafeArea(.all))
-        .onReceive(timer) { _ in state.fetch() }
-        .onAppear { state.fetch() }
     }
 }
 
