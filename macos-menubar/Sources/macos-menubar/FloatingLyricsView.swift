@@ -32,7 +32,9 @@ class FloatingLyricsWindow: NSWindow {
         let dx = event.deltaX
         let dy = event.deltaY
         DispatchQueue.main.async {
-            self.state?.dragVelocity = CGSize(width: dx, height: dy)
+            withAnimation(.interactiveSpring(response: 0.2, dampingFraction: 0.8)) {
+                self.state?.dragVelocity = CGSize(width: dx, height: dy)
+            }
         }
     }
     
@@ -109,8 +111,6 @@ struct FloatingLyricsView: View {
         .rotation3DEffect(.degrees(state.dragVelocity.width * 0.5), axis: (x: 0, y: 1, z: 0))
         .rotation3DEffect(.degrees(-state.dragVelocity.height * 0.5), axis: (x: 1, y: 0, z: 0))
         .animation(.spring(response: 0.4, dampingFraction: 0.8), value: state.currentLyricIndex)
-        .animation(.easeInOut(duration: 0.4), value: state.isTop)
-        .animation(.easeInOut(duration: 0.4), value: state.isLeft)
         .animation(.spring(response: 0.4, dampingFraction: 0.7), value: state.isMiniMode)
     }
     
