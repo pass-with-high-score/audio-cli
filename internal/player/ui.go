@@ -40,6 +40,35 @@ var (
 			MarginTop(1)
 )
 
+func createEQ(base beep.Streamer, sampleRate beep.SampleRate, cfg Config) beep.Streamer {
+	var sections effects.MonoEqualizerSections
+	
+	addBand := func(f0, bf, g float64) {
+		if g == 0 {
+			return
+		}
+		sections = append(sections, effects.MonoEqualizerSection{
+			F0: f0,
+			Bf: bf,
+			GB: g / 2.0,
+			G0: 0,
+			G:  g,
+		})
+	}
+	
+	addBand(60, 60, cfg.Band60)
+	addBand(250, 250, cfg.Band250)
+	addBand(1000, 1000, cfg.Band1k)
+	addBand(4000, 4000, cfg.Band4k)
+	addBand(12000, 12000, cfg.Band12k)
+	
+	if len(sections) == 0 {
+		return base
+	}
+	
+	return effects.NewEqualizer(base, sampleRate, sections)
+}
+
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if m.searching {
 		switch msg := msg.(type) {
@@ -93,13 +122,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.ctrl = &beep.Ctrl{Streamer: m.streamer, Paused: false}
 		m.volume = &effects.Volume{Streamer: m.ctrl, Base: 2, Volume: m.config.Volume, Silent: false}
 		
-		eq := effects.NewEqualizer(m.volume, m.format.SampleRate, effects.MonoEqualizerSections{
-			{F0: 60, Bf: 60, GB: 0, G0: 0, G: m.config.Band60},
-			{F0: 250, Bf: 250, GB: 0, G0: 0, G: m.config.Band250},
-			{F0: 1000, Bf: 1000, GB: 0, G0: 0, G: m.config.Band1k},
-			{F0: 4000, Bf: 4000, GB: 0, G0: 0, G: m.config.Band4k},
-			{F0: 12000, Bf: 12000, GB: 0, G0: 0, G: m.config.Band12k},
-		})
+		eq := createEQ(m.volume, m.format.SampleRate, m.config)
 
 		m.visualizer = &Visualizer{streamer: eq}
 
@@ -166,13 +189,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				case "9": m.config.Band12k -= 1
 				case "0": m.config.Band12k += 1
 				}
-				eq := effects.NewEqualizer(m.volume, m.format.SampleRate, effects.MonoEqualizerSections{
-					{F0: 60, Bf: 60, GB: 0, G0: 0, G: m.config.Band60},
-					{F0: 250, Bf: 250, GB: 0, G0: 0, G: m.config.Band250},
-					{F0: 1000, Bf: 1000, GB: 0, G0: 0, G: m.config.Band1k},
-					{F0: 4000, Bf: 4000, GB: 0, G0: 0, G: m.config.Band4k},
-					{F0: 12000, Bf: 12000, GB: 0, G0: 0, G: m.config.Band12k},
-				})
+				eq := createEQ(m.volume, m.format.SampleRate, m.config)
 				m.visualizer.streamer = eq
 				speaker.Unlock()
 				go saveConfig(m.config)
@@ -188,13 +205,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.config.Band4k = 0
 				m.config.Band12k = 0
 				
-				eq := effects.NewEqualizer(m.volume, m.format.SampleRate, effects.MonoEqualizerSections{
-					{F0: 60, Bf: 60, GB: 0, G0: 0, G: m.config.Band60},
-					{F0: 250, Bf: 250, GB: 0, G0: 0, G: m.config.Band250},
-					{F0: 1000, Bf: 1000, GB: 0, G0: 0, G: m.config.Band1k},
-					{F0: 4000, Bf: 4000, GB: 0, G0: 0, G: m.config.Band4k},
-					{F0: 12000, Bf: 12000, GB: 0, G0: 0, G: m.config.Band12k},
-				})
+				eq := createEQ(m.volume, m.format.SampleRate, m.config)
 				m.visualizer.streamer = eq
 				speaker.Unlock()
 				go saveConfig(m.config)
