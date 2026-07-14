@@ -25,7 +25,13 @@ jobs:
       run: go mod download
 
     - name: Build
-      run: go build -v ./...
+      run: go build -v -o audio-cli ./cmd/audio-cli
 
     - name: Test
       run: go test -v ./...
+
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: audio-cli-ubuntu
+        path: audio-cli
