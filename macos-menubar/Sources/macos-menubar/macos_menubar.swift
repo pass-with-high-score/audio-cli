@@ -405,6 +405,10 @@ class FloatingLyricsWindow: NSWindow {
         self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
     }
     
+    override func constrainFrameRect(_ frameRect: NSRect, to screen: NSScreen?) -> NSRect {
+        return frameRect // Allow free dragging off-screen
+    }
+    
     override func mouseDown(with event: NSEvent) {
         self.initialLocation = event.locationInWindow
     }
