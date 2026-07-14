@@ -1,5 +1,6 @@
 import Cocoa
 import SwiftUI
+import MediaPlayer
 
 struct TrackStatus: Decodable {
     var title: String
@@ -16,6 +17,10 @@ struct TrackStatus: Decodable {
 class AppState: ObservableObject {
     @Published var status = TrackStatus(title: "Loading...", artist: "", thumbnail: "", paused: false, volume: 1.0, percent: 0, position: 0, duration: 0)
     
+    init() {
+        setupRemoteTransportControls()
+    }
+    
     func fetch() {
         guard let url = URL(string: "http://localhost:13337/status") else { return }
         Task {
@@ -23,6 +28,7 @@ class AppState: ObservableObject {
                 let (data, _) = try await URLSession.shared.data(from: url)
                 if let s = try? JSONDecoder().decode(TrackStatus.self, from: data) {
                     self.status = s
+                    self.updateNowPlaying()
                 }
             } catch {}
         }
@@ -38,6 +44,57 @@ class AppState: ObservableObject {
                 try await Task.sleep(nanoseconds: 200_000_000)
                 self.fetch()
             } catch {}
+        }
+    }
+    
+    func seek(to pos: Double) {
+        guard let url = URL(string: "http://localhost:13337/seek?pos=\(pos)") else { return }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        Task { _ = try? await URLSession.shared.data(for: req) }
+    }
+    
+    func setVolume(_ vol: Double) {
+        guard let url = URL(string: "http://localhost:13337/volume?vol=\(vol)") else { return }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        Task { _ = try? await URLSession.shared.data(for: req) }
+    }
+    
+    func updateNowPlaying() {
+        var nowPlayingInfo = [String: Any]()
+        nowPlayingInfo[MPMediaItemPropertyTitle] = status.title
+        nowPlayingInfo[MPMediaItemPropertyArtist] = status.artist
+        nowPlayingInfo[MPNowPlayingInfoPropertyElapsedPlaybackTime] = status.position
+        nowPlayingInfo[MPMediaItemPropertyPlaybackDuration] = status.duration
+        nowPlayingInfo[MPNowPlayingInfoPropertyPlaybackRate] = status.paused ? 0.0 : 1.0
+        MPNowPlayingInfoCenter.default().nowPlayingInfo = nowPlayingInfo
+        
+        DispatchQueue.main.async {
+            if let delegate = NSApp.delegate as? AppDelegate, let button = delegate.statusItem?.button {
+                let iconName = self.status.paused ? "music.note" : "waveform"
+                button.image = NSImage(systemSymbolName: iconName, accessibilityDescription: "Audio CLI")
+            }
+        }
+    }
+    
+    func setupRemoteTransportControls() {
+        let commandCenter = MPRemoteCommandCenter.shared()
+        commandCenter.playCommand.addTarget { [unowned self] event in
+            self.post("playpause")
+            return .success
+        }
+        commandCenter.pauseCommand.addTarget { [unowned self] event in
+            self.post("playpause")
+            return .success
+        }
+        commandCenter.nextTrackCommand.addTarget { [unowned self] event in
+            self.post("next")
+            return .success
+        }
+        commandCenter.previousTrackCommand.addTarget { [unowned self] event in
+            self.post("prev")
+            return .success
         }
     }
 }
@@ -62,10 +119,21 @@ struct PopoverView: View {
             
             VStack(spacing: 5) {
                 Text(state.status.title).font(.headline).lineLimit(1).frame(maxWidth: 220)
+                    .help(state.status.title)
                 if state.status.artist != "" {
                     Text(state.status.artist).font(.subheadline).foregroundColor(.secondary).lineLimit(1).frame(maxWidth: 220)
+                        .help(state.status.artist)
                 }
             }
+            
+            Slider(value: Binding(get: {
+                state.status.position
+            }, set: { val in
+                state.status.position = val
+                state.seek(to: val)
+            }), in: 0...max(0.1, state.status.duration))
+            .controlSize(.small)
+            .tint(.accentColor)
             
             HStack(spacing: 30) {
                 Button(action: { state.post("prev") }) { 
@@ -81,9 +149,21 @@ struct PopoverView: View {
                     Image(systemName: "forward.fill").font(.title2) 
                 }.buttonStyle(.plain)
             }
+            
+            HStack {
+                Image(systemName: "speaker.fill").foregroundColor(.secondary).font(.caption2)
+                Slider(value: Binding(get: {
+                    state.status.volume
+                }, set: { val in
+                    state.status.volume = val
+                    state.setVolume(val)
+                }), in: 0...5)
+                .controlSize(.mini)
+                Image(systemName: "speaker.wave.3.fill").foregroundColor(.secondary).font(.caption2)
+            }
         }
         .padding(20)
-        .frame(width: 260, height: 280)
+        .frame(width: 260, height: 320)
         .background(VisualEffectView().edgesIgnoringSafeArea(.all))
         .onReceive(timer) { _ in state.fetch() }
         .onAppear { state.fetch() }
@@ -121,7 +201,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         let contentView = PopoverView()
         popover = NSPopover()
-        popover.contentSize = NSSize(width: 260, height: 280)
+        popover.contentSize = NSSize(width: 260, height: 320)
         popover.behavior = .transient
         popover.contentViewController = NSHostingController(rootView: contentView)
         

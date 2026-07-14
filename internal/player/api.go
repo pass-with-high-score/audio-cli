@@ -117,6 +117,26 @@ func handlePrev(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(200)
 }
 
+func handleSeek(w http.ResponseWriter, r *http.Request) {
+	posStr := r.URL.Query().Get("pos")
+	if posStr != "" {
+		if apiProg != nil {
+			apiProg.Send(seekMsg{posStr})
+		}
+	}
+	w.WriteHeader(200)
+}
+
+func handleVolume(w http.ResponseWriter, r *http.Request) {
+	volStr := r.URL.Query().Get("vol")
+	if volStr != "" {
+		if apiProg != nil {
+			apiProg.Send(volMsg{volStr})
+		}
+	}
+	w.WriteHeader(200)
+}
+
 func startAPI(p *tea.Program, m *model) {
 	apiProg = p
 	apiModel = m
@@ -124,9 +144,13 @@ func startAPI(p *tea.Program, m *model) {
 	http.HandleFunc("/playpause", handlePlayPause)
 	http.HandleFunc("/next", handleNext)
 	http.HandleFunc("/prev", handlePrev)
+	http.HandleFunc("/seek", handleSeek)
+	http.HandleFunc("/volume", handleVolume)
 	go http.ListenAndServe(":13337", nil)
 }
 
 type toggleMsg struct{}
 type nextTrackMsg struct{}
 type prevTrackMsg struct{}
+type seekMsg struct{ pos string }
+type volMsg struct{ vol string }

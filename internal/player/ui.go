@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -319,6 +320,28 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 		return m, tick()
+
+	case seekMsg:
+		if m.streamer != nil {
+			if pos, err := strconv.ParseFloat(msg.pos, 64); err == nil {
+				speaker.Lock()
+				m.streamer.Seek(m.format.SampleRate.N(time.Duration(pos * float64(time.Second))))
+				speaker.Unlock()
+			}
+		}
+		return m, nil
+
+	case volMsg:
+		if m.volume != nil {
+			if vol, err := strconv.ParseFloat(msg.vol, 64); err == nil {
+				speaker.Lock()
+				m.volume.Volume = vol
+				m.config.Volume = vol
+				speaker.Unlock()
+				go saveConfig(m.config)
+			}
+		}
+		return m, nil
 
 	case toggleMsg:
 		if m.ctrl != nil {
