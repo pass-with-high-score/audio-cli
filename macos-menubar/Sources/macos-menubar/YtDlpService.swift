@@ -120,11 +120,11 @@ final class YtDlpService: ObservableObject {
         
         let audioFormat: String
         if quality == "128k" {
-            audioFormat = "bestaudio[abr<=128]/bestaudio"
+            audioFormat = "bestaudio[abr<=128]/bestaudio/best"
         } else if quality == "256k" {
-            audioFormat = "bestaudio[abr<=256]/bestaudio"
+            audioFormat = "bestaudio[abr<=256]/bestaudio/best"
         } else {
-            audioFormat = "bestaudio"
+            audioFormat = "bestaudio/best"
         }
 
         _ = try await runYtDlp(arguments: [
