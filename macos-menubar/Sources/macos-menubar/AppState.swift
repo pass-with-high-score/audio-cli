@@ -236,7 +236,7 @@ class AppState: ObservableObject {
         // Fetch lyrics for new track
         if track.title != lastSearchedTitle {
             lastSearchedTitle = track.title
-            fetchLyrics(for: track.title)
+            fetchLyrics(for: track.title, artist: track.artist)
         }
 
         // Extract dominant color from thumbnail
@@ -360,9 +360,13 @@ class AppState: ObservableObject {
 
     // MARK: - Lyrics
 
-    func fetchLyrics(for title: String) {
-        let cleanTitle = title.components(separatedBy: "(")[0].components(separatedBy: "[")[0].trimmingCharacters(in: .whitespaces)
-        guard let encoded = cleanTitle.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+    func fetchLyrics(for title: String, artist: String = "") {
+        var query = title.components(separatedBy: "(")[0].components(separatedBy: "[")[0].components(separatedBy: "|")[0].components(separatedBy: "｜")[0].trimmingCharacters(in: .whitespaces)
+        if !artist.isEmpty && artist != "Local File" && !query.lowercased().contains(artist.lowercased()) {
+            query += " " + artist
+        }
+        
+        guard let encoded = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
               let url = URL(string: "https://lrclib.net/api/search?q=\(encoded)") else { return }
 
         var request = URLRequest(url: url)
