@@ -86,7 +86,7 @@ final class YtDlpService: ObservableObject {
 
         let output = try await runYtDlp(arguments: [
             "--extractor-args", "youtube:player_client=android",
-            "--print", "%(title)s|%(id)s|%(url)s|%(uploader)s",
+            "--print", "%(title)s|%(id)s|%(webpage_url)s|%(uploader)s",
             effectiveQuery
         ])
 
