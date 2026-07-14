@@ -177,6 +177,28 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				speaker.Unlock()
 				go saveConfig(m.config)
 			}
+		case "r", "R":
+			if m.volume != nil {
+				speaker.Lock()
+				m.volume.Volume = 0
+				m.config.Volume = 0
+				m.config.Band60 = 0
+				m.config.Band250 = 0
+				m.config.Band1k = 0
+				m.config.Band4k = 0
+				m.config.Band12k = 0
+				
+				eq := effects.NewEqualizer(m.volume, m.format.SampleRate, effects.MonoEqualizerSections{
+					{F0: 60, Bf: 60, GB: 0, G0: 0, G: m.config.Band60},
+					{F0: 250, Bf: 250, GB: 0, G0: 0, G: m.config.Band250},
+					{F0: 1000, Bf: 1000, GB: 0, G0: 0, G: m.config.Band1k},
+					{F0: 4000, Bf: 4000, GB: 0, G0: 0, G: m.config.Band4k},
+					{F0: 12000, Bf: 12000, GB: 0, G0: 0, G: m.config.Band12k},
+				})
+				m.visualizer.streamer = eq
+				speaker.Unlock()
+				go saveConfig(m.config)
+			}
 		case "j", "left":
 			if m.streamer != nil {
 				speaker.Lock()
@@ -377,7 +399,7 @@ func (m model) View() string {
 		}
 	}
 
-	s += helpStyle.Render("Space: Pause • N/P: Next/Prev • Left/Right: Seek • Up/Down: Vol • 1-0: EQ • /: Search • Q: Quit") + "\n"
+	s += helpStyle.Render("Space: Pause • N/P: Next/Prev • Left/Right: Seek • Up/Down: Vol • 1-0: EQ • R: Reset • /: Search • Q: Quit") + "\n"
 
 	return s
 }
