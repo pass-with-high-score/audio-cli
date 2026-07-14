@@ -105,7 +105,7 @@ final class YtDlpService: ObservableObject {
 
     /// Downloads audio for the given YouTube URL and returns a local file URL.
     /// Results are cached using an MD5 hash of the URL as the filename.
-    func downloadAudio(from youtubeURL: String) async throws -> URL {
+    func downloadAudio(from youtubeURL: String, quality: String = "bestaudio") async throws -> URL {
         await ensureBinary()
         let hash = md5(youtubeURL)
         let outputPath = cacheDir.appendingPathComponent("\(hash).mp3")
@@ -113,11 +113,22 @@ final class YtDlpService: ObservableObject {
         if FileManager.default.fileExists(atPath: outputPath.path) {
             return outputPath
         }
+        
+        let audioFormat: String
+        if quality == "128k" {
+            audioFormat = "bestaudio[abr<=128]/bestaudio"
+        } else if quality == "256k" {
+            audioFormat = "bestaudio[abr<=256]/bestaudio"
+        } else {
+            audioFormat = "bestaudio"
+        }
 
         _ = try await runYtDlp(arguments: [
             "--extractor-args", "youtube:player_client=android",
             "-x",
             "--audio-format", "mp3",
+            "--audio-quality", quality == "bestaudio" ? "0" : "5",
+            "-f", audioFormat,
             "-o", outputPath.path,
             youtubeURL
         ])

@@ -36,7 +36,14 @@ class AppState: ObservableObject {
     var timer: Timer?
 
     init() {
+        let defaultVol = UserDefaults.standard.object(forKey: "defaultVolume") as? Double ?? 1.0
+        status.volume = defaultVol
+        audioPlayer.setVolume(Float(defaultVol))
+        
         setupRemoteTransportControls()
+        
+        // Auto-cleanup cache on startup
+        performCacheCleanup()
 
         audioPlayer.onTrackFinished = { [weak self] in
             Task { @MainActor in
@@ -198,8 +205,12 @@ class AppState: ObservableObject {
         }
 
         do {
+            // Auto-cleanup cache before downloading
+            performCacheCleanup()
+            
             // Download audio if not already cached
-            let localPath = try await ytdlp.downloadAudio(from: track.url)
+            let audioQuality = UserDefaults.standard.string(forKey: "audioQuality") ?? "bestaudio"
+            let localPath = try await ytdlp.downloadAudio(from: track.url, quality: audioQuality)
             audioPlayer.play(fileURL: localPath)
             updateStatus()
         } catch {
@@ -264,6 +275,39 @@ class AppState: ObservableObject {
             }
         }
         Task { await playCurrentTrack() }
+    }
+    
+    private func performCacheCleanup() {
+        let cacheDir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!.appendingPathComponent("audio-cli-yt")
+        let maxCacheSizeGB = UserDefaults.standard.object(forKey: "maxCacheSizeGB") as? Double ?? 2.0
+        let maxBytes = Int64(maxCacheSizeGB * 1024 * 1024 * 1024)
+        
+        guard let files = try? FileManager.default.contentsOfDirectory(at: cacheDir, includingPropertiesForKeys: [.fileSizeKey, .creationDateKey]) else { return }
+        
+        var fileStats: [(url: URL, size: Int64, date: Date)] = []
+        var totalSize: Int64 = 0
+        
+        for file in files {
+            if let attrs = try? FileManager.default.attributesOfItem(atPath: file.path),
+               let size = attrs[.size] as? Int64,
+               let date = attrs[.creationDate] as? Date {
+                fileStats.append((url: file, size: size, date: date))
+                totalSize += size
+            }
+        }
+        
+        if totalSize > maxBytes {
+            // Sort by oldest first
+            fileStats.sort { $0.date < $1.date }
+            
+            for file in fileStats {
+                try? FileManager.default.removeItem(at: file.url)
+                totalSize -= file.size
+                if totalSize <= maxBytes {
+                    break
+                }
+            }
+        }
     }
 
     // MARK: - Lyrics

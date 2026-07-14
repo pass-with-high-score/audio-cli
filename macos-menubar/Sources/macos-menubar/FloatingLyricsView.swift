@@ -80,6 +80,8 @@ class FloatingLyricsWindow: NSWindow {
 struct FloatingLyricsView: View {
     @ObservedObject var state: AppState
     @State private var isHovering = false
+    @AppStorage("floatingOpacity") private var floatingOpacity = 1.0
+    @AppStorage("floatingFontSize") private var floatingFontSize = 36.0
 
     var alignment: Alignment {
         switch (state.isTop, state.isLeft) {
@@ -108,6 +110,7 @@ struct FloatingLyricsView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: alignment)
         .padding(40)
+        .opacity(floatingOpacity)
         .rotation3DEffect(.degrees(state.dragVelocity.width * 0.5), axis: (x: 0, y: 1, z: 0))
         .rotation3DEffect(.degrees(-state.dragVelocity.height * 0.5), axis: (x: 1, y: 0, z: 0))
         .offset(y: state.currentEasterEgg == .windowBounce ? -40 : 0)
@@ -134,8 +137,11 @@ struct FloatingLyricsView: View {
         let i = state.currentLyricIndex + offset
         if i >= 0 && i < state.lyrics.count {
             let distance = abs(offset)
+            let baseSize = floatingFontSize
+            let secondarySize = max(16.0, baseSize * 0.66)
+            
             Text(state.lyrics[i].text)
-                .font(.system(size: distance == 0 ? 36 : 24, weight: distance == 0 ? .black : .semibold, design: .rounded))
+                .font(.system(size: distance == 0 ? baseSize : secondarySize, weight: distance == 0 ? .black : .semibold, design: .rounded))
                 .foregroundColor(.white)
                 .opacity(distance == 0 ? 1.0 : (distance == 1 ? 0.4 : 0.1))
                 .shadow(color: distance == 0 ? state.dominantColor.opacity(0.8) : .black.opacity(0.5), radius: distance == 0 ? 10 : 2, x: 0, y: distance == 0 ? 0 : 2)

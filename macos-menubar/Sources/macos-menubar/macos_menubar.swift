@@ -19,7 +19,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var settingsWindow: NSWindow?
     
     func applicationWillFinishLaunching(_ notification: Notification) {
-        NSApp.setActivationPolicy(.accessory)
+        let showDockIcon = UserDefaults.standard.bool(forKey: "showDockIcon")
+        NSApp.setActivationPolicy(showDockIcon ? .regular : .accessory)
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -84,7 +85,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         if settingsWindow == nil {
             let settingsView = SettingsView()
             let window = NSWindow(
-                contentRect: NSRect(x: 0, y: 0, width: 450, height: 300),
+                contentRect: NSRect(x: 0, y: 0, width: 520, height: 380),
                 styleMask: [.titled, .closable, .miniaturizable],
                 backing: .buffered, defer: false)
             window.center()
