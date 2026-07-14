@@ -282,17 +282,73 @@ struct FloatingLyricsView: View {
     @ObservedObject var state: AppState
 
     var body: some View {
-        VStack {
-            if !state.lyrics.isEmpty && state.currentLyricIndex >= 0 && state.currentLyricIndex < state.lyrics.count {
-                Text(state.lyrics[state.currentLyricIndex].text)
-                    .font(.system(size: 36, weight: .black, design: .rounded))
-                    .foregroundColor(.white)
-                    .shadow(color: .black.opacity(0.8), radius: 2, x: 0, y: 2)
-                    .shadow(color: .black.opacity(0.5), radius: 10, x: 0, y: 0)
-                    .multilineTextAlignment(.leading)
-                    .lineLimit(2)
-                    .id(state.lyrics[state.currentLyricIndex].id)
-                    .transition(.opacity.combined(with: .move(edge: .bottom)))
+        VStack(alignment: .leading, spacing: 12) {
+            if !state.lyrics.isEmpty && state.currentLyricIndex >= 0 {
+                if state.currentLyricIndex - 1 >= 0 {
+                    Text(state.lyrics[state.currentLyricIndex - 1].text)
+                        .font(.system(size: 24, weight: .semibold, design: .rounded))
+                        .foregroundColor(.white.opacity(0.4))
+                        .shadow(color: .black.opacity(0.8), radius: 2, x: 0, y: 2)
+                        .multilineTextAlignment(.leading)
+                        .lineLimit(1)
+                }
+                
+                if state.currentLyricIndex < state.lyrics.count {
+                    Text(state.lyrics[state.currentLyricIndex].text)
+                        .font(.system(size: 36, weight: .black, design: .rounded))
+                        .foregroundColor(.white)
+                        .shadow(color: .black.opacity(0.8), radius: 2, x: 0, y: 2)
+                        .shadow(color: .black.opacity(0.5), radius: 10, x: 0, y: 0)
+                        .multilineTextAlignment(.leading)
+                        .lineLimit(2)
+                        .id(state.lyrics[state.currentLyricIndex].id)
+                        .transition(.opacity.combined(with: .move(edge: .bottom)))
+                }
+                
+                if state.currentLyricIndex + 1 < state.lyrics.count {
+                    Text(state.lyrics[state.currentLyricIndex + 1].text)
+                        .font(.system(size: 24, weight: .semibold, design: .rounded))
+                        .foregroundColor(.white.opacity(0.4))
+                        .shadow(color: .black.opacity(0.8), radius: 2, x: 0, y: 2)
+                        .multilineTextAlignment(.leading)
+                        .lineLimit(1)
+                }
+            }
+            
+            Spacer().frame(height: 10)
+            
+            if state.status.title != "Loading..." {
+                HStack(spacing: 12) {
+                    if state.status.thumbnail != "" {
+                        AsyncImage(url: URL(string: state.status.thumbnail)) { phase in
+                            if let image = phase.image {
+                                image.resizable().aspectRatio(contentMode: .fill)
+                            } else {
+                                Color.gray.opacity(0.3)
+                            }
+                        }.frame(width: 40, height: 40).cornerRadius(6)
+                    } else {
+                        Image(systemName: "music.note.list")
+                            .font(.system(size: 20))
+                            .foregroundColor(.white)
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(state.status.title)
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundColor(.white)
+                            .lineLimit(1)
+                        if state.status.artist != "" {
+                            Text(state.status.artist)
+                                .font(.system(size: 13))
+                                .foregroundColor(.white.opacity(0.8))
+                                .lineLimit(1)
+                        }
+                    }
+                }
+                .padding(10)
+                .background(VisualEffectView().cornerRadius(12).opacity(0.9))
+                .shadow(color: .black.opacity(0.5), radius: 5, x: 0, y: 2)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
@@ -346,7 +402,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         
         let screenRect = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
-        let floatingRect = NSRect(x: screenRect.minX, y: screenRect.minY, width: screenRect.width / 2, height: 300)
+        let floatingRect = NSRect(x: screenRect.minX, y: screenRect.minY, width: screenRect.width / 2, height: 500)
         let floatingContentView = FloatingLyricsView(state: state)
         floatingWindow = FloatingLyricsWindow(contentRect: floatingRect, backing: .buffered, defer: false)
         floatingWindow.contentView = NSHostingView(rootView: floatingContentView)
