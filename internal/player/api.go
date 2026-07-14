@@ -50,7 +50,11 @@ func handleStatus(w http.ResponseWriter, r *http.Request) {
 	}
 
 	m := apiModel // copy pointer
-	if len(m.filteredTracks) == 0 || m.loading {
+	if len(m.filteredTracks) == 0 {
+		json.NewEncoder(w).Encode(StatusResponse{Title: "No track playing"})
+		return
+	}
+	if m.loading {
 		json.NewEncoder(w).Encode(StatusResponse{Title: "Loading..."})
 		return
 	}
@@ -137,6 +141,21 @@ func handleVolume(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(200)
 }
 
+func handleAdd(w http.ResponseWriter, r *http.Request) {
+	query := r.URL.Query().Get("q")
+	if query != "" && apiProg != nil {
+		apiProg.Send(apiAddTrackMsg{query: query})
+	}
+	w.WriteHeader(200)
+}
+
+func handleQuit(w http.ResponseWriter, r *http.Request) {
+	if apiProg != nil {
+		apiProg.Send(tea.QuitMsg{})
+	}
+	w.WriteHeader(200)
+}
+
 func startAPI(p *tea.Program, m *model) {
 	apiProg = p
 	apiModel = m
@@ -146,6 +165,8 @@ func startAPI(p *tea.Program, m *model) {
 	http.HandleFunc("/prev", handlePrev)
 	http.HandleFunc("/seek", handleSeek)
 	http.HandleFunc("/volume", handleVolume)
+	http.HandleFunc("/add", handleAdd)
+	http.HandleFunc("/quit", handleQuit)
 	go http.ListenAndServe(":13337", nil)
 }
 
@@ -154,3 +175,4 @@ type nextTrackMsg struct{}
 type prevTrackMsg struct{}
 type seekMsg struct{ pos string }
 type volMsg struct{ vol string }
+type apiAddTrackMsg struct{ query string }

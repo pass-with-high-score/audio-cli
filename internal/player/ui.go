@@ -163,6 +163,10 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.progress.Width = msg.Width - 10
 		return m, nil
+		
+	case apiAddTrackMsg:
+		m.addStatus = "Searching YouTube / Local..."
+		return m, addTrackCmd(msg.query)
 
 	case trackAddedMsg:
 		m.addStatus = "" // clear searching message

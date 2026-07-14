@@ -4,9 +4,30 @@ import MediaPlayer
 
 struct PopoverView: View {
     @ObservedObject var state: AppState
+    @State private var searchQuery: String = ""
     
     var body: some View {
         VStack(spacing: 15) {
+            HStack {
+                TextField("Search YouTube or Add URL...", text: $searchQuery)
+                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                    .onSubmit {
+                        if !searchQuery.isEmpty {
+                            state.addTrack(query: searchQuery)
+                            searchQuery = ""
+                        }
+                    }
+                Button(action: {
+                    if !searchQuery.isEmpty {
+                        state.addTrack(query: searchQuery)
+                        searchQuery = ""
+                    }
+                }) {
+                    Image(systemName: "plus.circle.fill").foregroundColor(.accentColor).font(.title2)
+                }.buttonStyle(.plain)
+            }
+            .padding(.horizontal, 4)
+            
             if state.status.thumbnail != "" {
                 AsyncImage(url: URL(string: state.status.thumbnail)) { phase in
                     if let image = phase.image {

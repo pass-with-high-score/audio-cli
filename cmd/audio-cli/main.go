@@ -1,19 +1,16 @@
 package main
 
 import (
-	"fmt"
 	"os"
 
 	"audio-cli/internal/player"
 )
 
 func main() {
-	if len(os.Args) < 2 {
-		fmt.Println("Usage: audio-cli <file or directory> [-shuffle] [-loop]")
-		os.Exit(1)
+	path := ""
+	if len(os.Args) >= 2 {
+		path = os.Args[1]
 	}
-
-	path := os.Args[1]
 	shuffleFlag := false
 	loopFlag := false
 

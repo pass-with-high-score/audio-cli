@@ -16,12 +16,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var popover: NSPopover!
     let state = AppState()
     var floatingWindow: FloatingLyricsWindow!
+    var backendProcess: Process?
     
     func applicationWillFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        startBackend()
         let contentView = PopoverView(state: state)
         popover = NSPopover()
         popover.contentSize = NSSize(width: 260, height: 450)
@@ -52,5 +54,26 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
             }
         }
+    }
+    
+    func startBackend() {
+        let process = Process()
+        let audioCliPath = Bundle.main.url(forResource: "audio-cli", withExtension: nil)?.path 
+                           ?? FileManager.default.currentDirectoryPath + "/audio-cli"
+        process.executableURL = URL(fileURLWithPath: audioCliPath)
+        process.arguments = []
+        
+        do {
+            try process.run()
+            backendProcess = process
+            print("Backend started successfully")
+        } catch {
+            print("Failed to start backend: \(error)")
+        }
+    }
+    
+    func applicationWillTerminate(_ notification: Notification) {
+        state.quitBackend()
+        backendProcess?.terminate()
     }
 }

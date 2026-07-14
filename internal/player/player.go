@@ -21,8 +21,9 @@ func Run(path string, shuffleFlag bool, loopFlag bool) {
 	var tracks []Track
 	var filtered []int
 
-	if strings.HasPrefix(path, "http://") || strings.HasPrefix(path, "https://") {
-		ytDlpPath, err := ensureYtDlp()
+	if path != "" {
+		if strings.HasPrefix(path, "http://") || strings.HasPrefix(path, "https://") {
+			ytDlpPath, err := ensureYtDlp()
 		if err != nil {
 			fmt.Printf("❌ Error: Failed to setup internal yt-dlp: %v\n", err)
 			os.Exit(1)
@@ -132,10 +133,10 @@ func Run(path string, shuffleFlag bool, loopFlag bool) {
 			filtered = append(filtered, i)
 		}
 	}
-
+	}
+	
 	if len(tracks) == 0 {
-		fmt.Println("No tracks found.")
-		os.Exit(1)
+		fmt.Println("No tracks found. Waiting for /add requests...")
 	}
 
 	ti := textinput.New()
@@ -159,7 +160,7 @@ func Run(path string, shuffleFlag bool, loopFlag bool) {
 	m.addInput.Placeholder = "Enter YouTube search (e.g. yt: em cua ngay hom qua) or URL"
 	m.addInput.Prompt = ""
 
-	p := tea.NewProgram(&m)
+	p := tea.NewProgram(&m, tea.WithoutRenderer(), tea.WithInput(nil))
 	startAPI(p, &m)
 
 	if _, err := p.Run(); err != nil {
@@ -169,7 +170,10 @@ func Run(path string, shuffleFlag bool, loopFlag bool) {
 }
 
 func (m *model) Init() tea.Cmd {
-	return tea.Batch(tick(), m.loadSongCmd(m.currentIndex))
+	if len(m.filteredTracks) > 0 {
+		return tea.Batch(tick(), m.loadSongCmd(m.currentIndex))
+	}
+	return tick()
 }
 
 func tick() tea.Cmd {

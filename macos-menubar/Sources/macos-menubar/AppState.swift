@@ -84,6 +84,21 @@ class AppState: ObservableObject {
         Task { _ = try? await URLSession.shared.data(for: req) }
     }
     
+    func addTrack(query: String) {
+        guard let encoded = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+              let url = URL(string: "http://localhost:13337/add?q=\(encoded)") else { return }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        Task { _ = try? await URLSession.shared.data(for: req) }
+    }
+    
+    func quitBackend() {
+        guard let url = URL(string: "http://localhost:13337/quit") else { return }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        Task { _ = try? await URLSession.shared.data(for: req) }
+    }
+    
     func fetchLyrics(for title: String) {
         let cleanTitle = title.components(separatedBy: "(")[0].components(separatedBy: "[")[0].trimmingCharacters(in: .whitespaces)
         guard let encoded = cleanTitle.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
