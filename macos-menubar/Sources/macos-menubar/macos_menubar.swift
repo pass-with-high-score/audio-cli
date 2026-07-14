@@ -291,29 +291,26 @@ struct PopoverView: View {
 struct OnekoView: View {
     @State private var catPos: CGPoint = CGPoint(x: 100, y: 100)
     @State private var isMoving = false
-    @State private var facingRight = false
-    @State private var wiggle = false
     @State private var sleepTick = 0
+    @State private var tickCounter = 0
+    @State private var frameNo = 25
+    @State private var surpriseTick = 0
     
-    let timer = Timer.publish(every: 0.05, on: .main, in: .common).autoconnect()
+    let timer = Timer.publish(every: 0.1, on: .main, in: .common).autoconnect()
     
     var body: some View {
         ZStack {
-            Text(isMoving ? "🐈" : (sleepTick > 20 ? "🐱" : "🐈"))
-                .font(.system(size: 32))
-                .scaleEffect(x: facingRight ? -1 : 1, y: 1)
-                .rotationEffect(.degrees(isMoving && wiggle ? (facingRight ? 10 : -10) : 0))
-                .offset(y: isMoving && wiggle ? -4 : 0)
-                .position(catPos)
-                .shadow(color: .black.opacity(0.5), radius: 2)
-            
-            if !isMoving && sleepTick > 30 {
-                Text(sleepTick % 20 < 10 ? "💤" : "z")
-                    .font(.system(size: 14))
-                    .position(x: catPos.x + (facingRight ? 15 : -15), y: catPos.y - 20)
+            if let url = Bundle.module.url(forResource: "\(frameNo)", withExtension: "gif"),
+               let nsImage = NSImage(contentsOf: url) {
+                Image(nsImage: nsImage)
+                    .resizable()
+                    .frame(width: 32, height: 32)
+                    .position(catPos)
+                    .shadow(color: .black.opacity(0.3), radius: 2)
             }
         }
         .onReceive(timer) { _ in
+            tickCounter += 1
             if let window = NSApp.windows.first(where: { $0 is FloatingLyricsWindow }) {
                 let mouseLoc = NSEvent.mouseLocation
                 let windowFrame = window.frame
@@ -329,18 +326,58 @@ struct OnekoView: View {
                 let dy = target.y - catPos.y
                 let dist = sqrt(dx*dx + dy*dy)
                 
-                if dist > 20 {
-                    isMoving = true
-                    sleepTick = 0
-                    facingRight = dx > 0
-                    wiggle.toggle()
+                if surpriseTick > 0 {
+                    surpriseTick -= 1
+                    frameNo = 32
+                    return
+                }
+                
+                if dist > 25 {
+                    if !isMoving {
+                        surpriseTick = 5 // Surprise before moving
+                        isMoving = true
+                        sleepTick = 0
+                        return
+                    }
                     
-                    let speed: CGFloat = min(dist, 10.0)
+                    let jdx = Double(dx)
+                    let jdy = Double(-dy)
+                    let javaTheta = atan2(jdy, jdx)
+                    
+                    if javaTheta >= -Double.pi/8 && javaTheta <= Double.pi/8 {
+                        frameNo = (frameNo == 5) ? 6 : 5 // right
+                    } else if javaTheta > Double.pi/8 && javaTheta < 3*Double.pi/8 {
+                        frameNo = (frameNo == 3) ? 4 : 3 // upper-right
+                    } else if javaTheta >= 3*Double.pi/8 && javaTheta <= 5*Double.pi/8 {
+                        frameNo = (frameNo == 1) ? 2 : 1 // up
+                    } else if javaTheta > 5*Double.pi/8 && javaTheta < 7*Double.pi/8 {
+                        frameNo = (frameNo == 15) ? 16 : 15 // upper-left
+                    } else if javaTheta >= 7*Double.pi/8 || javaTheta <= -7*Double.pi/8 {
+                        frameNo = (frameNo == 13) ? 14 : 13 // left
+                    } else if javaTheta > -7*Double.pi/8 && javaTheta < -5*Double.pi/8 {
+                        frameNo = (frameNo == 11) ? 12 : 11 // bottom-left
+                    } else if javaTheta >= -5*Double.pi/8 && javaTheta <= -3*Double.pi/8 {
+                        frameNo = (frameNo == 9) ? 10 : 9 // down
+                    } else {
+                        frameNo = (frameNo == 7) ? 8 : 7 // bottom-right
+                    }
+                    
+                    let speed: CGFloat = min(dist, 15.0)
                     catPos.x += (dx / dist) * speed
                     catPos.y += (dy / dist) * speed
                 } else {
                     isMoving = false
                     sleepTick += 1
+                    
+                    if sleepTick < 10 {
+                        frameNo = (tickCounter % 2 == 0) ? 31 : 25 // lick
+                    } else if sleepTick < 20 {
+                        frameNo = (tickCounter % 2 == 0) ? 27 : 28 // scratch
+                    } else if sleepTick < 25 {
+                        frameNo = 26 // yawn
+                    } else {
+                        frameNo = (tickCounter % 4 < 2) ? 29 : 30 // sleep
+                    }
                 }
             }
         }
