@@ -181,12 +181,44 @@ class AppState: ObservableObject {
     }
     
     func addLocalTrack(url: URL) {
-        let filename = url.deletingPathExtension().lastPathComponent
-        let trackInfo = TrackInfo(title: filename, videoId: "", url: url.absoluteString, artist: "Local File")
-        tracks.append(trackInfo)
-        if tracks.count == 1 {
-            currentTrackIndex = 0
-            Task { await playCurrentTrack() }
+        let asset = AVAsset(url: url)
+        var title = url.deletingPathExtension().lastPathComponent
+        var artist = "Local File"
+        var artworkUrl: String? = nil
+        
+        Task {
+            if let metadata = try? await asset.load(.metadata) {
+                for item in metadata {
+                    if let commonKey = item.commonKey?.rawValue {
+                        switch commonKey {
+                        case "title":
+                            if let val = try? await item.load(.stringValue) { title = val }
+                        case "artist":
+                            if let val = try? await item.load(.stringValue) { artist = val }
+                        case "artwork":
+                            if let data = try? await item.load(.dataValue) {
+                                let tempDir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!.appendingPathComponent("audio-cli-yt/artworks")
+                                try? FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+                                let artworkFile = tempDir.appendingPathComponent(UUID().uuidString + ".jpg")
+                                try? data.write(to: artworkFile)
+                                artworkUrl = artworkFile.absoluteString
+                            }
+                        default:
+                            break
+                        }
+                    }
+                }
+            }
+            
+            let trackInfo = TrackInfo(title: title, videoId: "", url: url.absoluteString, artist: artist, localThumbnailURL: artworkUrl)
+            
+            await MainActor.run {
+                tracks.append(trackInfo)
+                if tracks.count == 1 {
+                    currentTrackIndex = 0
+                    Task { await playCurrentTrack() }
+                }
+            }
         }
     }
 

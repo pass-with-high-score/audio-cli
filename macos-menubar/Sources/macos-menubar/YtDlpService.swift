@@ -8,9 +8,12 @@ struct TrackInfo {
     let videoId: String
     let url: String
     let artist: String
+    var localThumbnailURL: String? = nil
 
     var thumbnailURL: String {
-        "https://img.youtube.com/vi/\(videoId)/hqdefault.jpg"
+        if let local = localThumbnailURL { return local }
+        if videoId.isEmpty { return "" }
+        return "https://img.youtube.com/vi/\(videoId)/hqdefault.jpg"
     }
 }
 
