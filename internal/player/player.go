@@ -29,9 +29,9 @@ func Run(path string, shuffleFlag bool, loopFlag bool) {
 		
 		fmt.Println("⏳ Fetching playlist info... Please wait.")
 		cmd := exec.Command("yt-dlp", "--flat-playlist", "--print", "%(title)s|%(url)s|%(uploader)s", path)
-		out, err := cmd.Output()
+		out, err := cmd.CombinedOutput()
 		if err != nil {
-			log.Fatalf("Failed to fetch playlist: %v", err)
+			log.Fatalf("\n❌ yt-dlp failed:\n%s\nError: %v\n\n💡 Tip: If YouTube says 'Sign in to confirm you’re not a bot' or 'HTTP 429', try updating yt-dlp (e.g., 'brew upgrade yt-dlp' or 'pip install -U yt-dlp') or use a different network.", string(out), err)
 		}
 		
 		lines := strings.Split(string(out), "\n")

@@ -34,8 +34,9 @@ func (m model) loadSongCmd(index int) tea.Cmd {
 			
 			if _, err := os.Stat(outFile); os.IsNotExist(err) {
 				cmd := exec.Command("yt-dlp", "-x", "--audio-format", "mp3", "-o", outFile, track.Path)
-				if err := cmd.Run(); err != nil {
-					return loadMsg{err: fmt.Errorf("failed to download: %v", err)}
+				out, err := cmd.CombinedOutput()
+				if err != nil {
+					return loadMsg{err: fmt.Errorf("failed to download (yt-dlp): %v\nOutput: %s", err, string(out))}
 				}
 			}
 			filePath = outFile
