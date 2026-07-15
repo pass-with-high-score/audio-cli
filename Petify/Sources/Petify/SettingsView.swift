@@ -120,6 +120,37 @@ struct SettingsView: View {
             }
             .padding(.bottom, 10)
             
+            GroupBox("Support Petify") {
+                HStack(spacing: 20) {
+                    Link(destination: URL(string: "https://buymeacoffee.com/nguyenquane")!) {
+                        HStack {
+                            Image(systemName: "cup.and.saucer.fill")
+                            Text("Buy Me a Coffee")
+                        }
+                        .padding(8)
+                        .background(Color.orange.opacity(0.8))
+                        .foregroundColor(.white)
+                        .cornerRadius(8)
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    
+                    Link(destination: URL(string: "https://github.com/sponsors/pass-with-high-score")!) {
+                        HStack {
+                            Image(systemName: "heart.fill")
+                            Text("GitHub Sponsors")
+                        }
+                        .padding(8)
+                        .background(Color.pink.opacity(0.8))
+                        .foregroundColor(.white)
+                        .cornerRadius(8)
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    
+                    Spacer()
+                }
+                .padding(.vertical, 4)
+            }
+            
             GroupBox("Keyboard Shortcuts") {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {
