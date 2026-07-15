@@ -93,19 +93,33 @@ struct PopoverView: View {
                         .frame(height: 80)
                 }
                 
-                // Text
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(state.status.title)
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundColor(.white)
-                        .shadow(radius: 2)
-                        .lineLimit(1)
-                    if !state.status.artist.isEmpty {
-                        Text(state.status.artist)
-                            .font(.system(size: 12))
-                            .foregroundColor(.white.opacity(0.85))
+                // Text and Download Button
+                HStack(alignment: .bottom) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(state.status.title)
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundColor(.white)
                             .shadow(radius: 2)
                             .lineLimit(1)
+                        if !state.status.artist.isEmpty {
+                            Text(state.status.artist)
+                                .font(.system(size: 12))
+                                .foregroundColor(.white.opacity(0.85))
+                                .shadow(radius: 2)
+                                .lineLimit(1)
+                        }
+                    }
+                    Spacer()
+                    if state.currentTrackIndex >= 0 && state.currentTrackIndex < state.tracks.count && !state.tracks[state.currentTrackIndex].url.hasPrefix("file://") {
+                        Button(action: {
+                            state.saveCurrentTrackOffline()
+                        }) {
+                            Image(systemName: "arrow.down.circle.fill")
+                                .font(.system(size: 20))
+                                .foregroundColor(.white.opacity(0.9))
+                        }
+                        .buttonStyle(.plain)
+                        .help("Download for offline playback")
                     }
                 }
                 .padding(12)

@@ -3,6 +3,7 @@ import SwiftUI
 import MediaPlayer
 import CoreImage
 import UserNotifications
+import CryptoKit
 
 enum EasterEgg {
     case hyperSpeed
@@ -22,6 +23,7 @@ class AppState: ObservableObject {
     @Published var isTop: Bool = false
     @Published var isLeft: Bool = true
     @Published var dominantColor: Color = .white
+    @Published var currentArtwork: NSImage? = nil
     @Published var dragVelocity: CGSize = .zero
     @Published var isMiniMode: Bool = false
     @Published var currentEasterEgg: EasterEgg? = nil
@@ -308,6 +310,45 @@ class AppState: ObservableObject {
         status.searchStatus = "Loading track..."
         playbackTask = Task { await _playCurrentTrack() }
     }
+    
+    func saveCurrentTrackOffline() {
+        guard currentTrackIndex >= 0 && currentTrackIndex < tracks.count else { return }
+        let track = tracks[currentTrackIndex]
+        guard !track.url.hasPrefix("file://") else { return }
+        
+        Task {
+            let hash = md5(track.url)
+            let cacheDir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!.appendingPathComponent("audio-cli-yt", isDirectory: true)
+            let cachedFile = cacheDir.appendingPathComponent("\(hash).mp3")
+            
+            let fm = FileManager.default
+            let downloadsDir = fm.urls(for: .downloadsDirectory, in: .userDomainMask).first!
+            let cleanArtist = track.artist.replacingOccurrences(of: "/", with: "-").replacingOccurrences(of: ":", with: "-")
+            let cleanTitle = track.title.replacingOccurrences(of: "/", with: "-").replacingOccurrences(of: ":", with: "-")
+            let offlineFileName = "\(cleanArtist) - \(cleanTitle).mp3"
+            let offlineFile = downloadsDir.appendingPathComponent(offlineFileName)
+            
+            do {
+                if fm.fileExists(atPath: cachedFile.path) {
+                    if fm.fileExists(atPath: offlineFile.path) {
+                        try fm.removeItem(at: offlineFile)
+                    }
+                    try fm.copyItem(at: cachedFile, to: offlineFile)
+                    
+                    let center = UNUserNotificationCenter.current()
+                    let content = UNMutableNotificationContent()
+                    content.title = "Download Complete"
+                    content.body = "Saved to Downloads: \(offlineFileName)"
+                    let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
+                    try? await center.add(request)
+                    
+                    self.musicLibrary.scanLocalMusic {}
+                }
+            } catch {
+                print("Failed to save offline: \(error)")
+            }
+        }
+    }
 
     private func _playCurrentTrack() async {
         guard currentTrackIndex >= 0 && currentTrackIndex < tracks.count else { return }
@@ -324,6 +365,9 @@ class AppState: ObservableObject {
         // Save to history
         let savedTrack = SavedTrack.from(track: track)
         musicLibrary.addToHistory(savedTrack)
+        
+        // Notification
+        sendTrackNotification(track: track)
 
         // Fetch lyrics for new track
         if track.title != lastSearchedTitle {
@@ -668,12 +712,38 @@ class AppState: ObservableObject {
         nowPlayingInfo[MPNowPlayingInfoPropertyElapsedPlaybackTime] = status.position
         nowPlayingInfo[MPMediaItemPropertyPlaybackDuration] = status.duration
         nowPlayingInfo[MPNowPlayingInfoPropertyPlaybackRate] = status.paused ? 0.0 : 1.0
+        
+        if let artwork = currentArtwork {
+            nowPlayingInfo[MPMediaItemPropertyArtwork] = MPMediaItemArtwork(boundsSize: artwork.size, requestHandler: { _ in artwork })
+        }
+        
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nowPlayingInfo
 
         DispatchQueue.main.async {
             if let delegate = NSApp.delegate as? AppDelegate, let button = delegate.statusItem?.button {
                 let iconName = self.status.paused ? "music.note" : "waveform"
                 button.image = NSImage(systemSymbolName: iconName, accessibilityDescription: "Petify")
+            }
+        }
+    }
+    
+    private func sendTrackNotification(track: TrackInfo) {
+        let center = UNUserNotificationCenter.current()
+        let content = UNMutableNotificationContent()
+        content.title = track.title
+        content.subtitle = track.artist
+        content.sound = nil // silent notification
+        let request = UNNotificationRequest(identifier: "NowPlaying", content: content, trigger: nil)
+        
+        Task {
+            let settings = await center.notificationSettings()
+            if settings.authorizationStatus == .authorized {
+                try? await center.add(request)
+            } else if settings.authorizationStatus == .notDetermined {
+                let granted = try? await center.requestAuthorization(options: [.alert, .sound])
+                if granted == true {
+                    try? await center.add(request)
+                }
             }
         }
     }
@@ -737,6 +807,8 @@ class AppState: ObservableObject {
                 let color = Color(red: Double(bitmap[0]) / 255.0, green: Double(bitmap[1]) / 255.0, blue: Double(bitmap[2]) / 255.0)
                 DispatchQueue.main.async {
                     self.dominantColor = color
+                    self.currentArtwork = nsImage
+                    self.updateNowPlaying()
                 }
             } catch {
                 print("Failed to extract dominant color: \(error)")
@@ -756,5 +828,11 @@ class AppState: ObservableObject {
                 self.currentEasterEgg = nil
             }
         }
+    }
+
+    private func md5(_ string: String) -> String {
+        let data = Data(string.utf8)
+        let digest = Insecure.MD5.hash(data: data)
+        return digest.map { String(format: "%02x", $0) }.joined()
     }
 }

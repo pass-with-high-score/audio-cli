@@ -5,9 +5,25 @@ struct LibraryView: View {
     @ObservedObject var library: MusicLibraryService
     @State private var selectedTab: String = "history"
     @State private var isScanning: Bool = false
+    @State private var searchText: String = ""
     
     var body: some View {
         VStack(spacing: 8) {
+            // Search Bar
+            HStack {
+                Image(systemName: "magnifyingglass").foregroundColor(.secondary).font(.caption)
+                TextField("Search in library...", text: $searchText)
+                    .textFieldStyle(.plain)
+                    .font(.caption)
+                if !searchText.isEmpty {
+                    Button(action: { searchText = "" }) {
+                        Image(systemName: "xmark.circle.fill").foregroundColor(.secondary)
+                    }.buttonStyle(.plain)
+                }
+            }
+            .padding(6)
+            .background(Color.secondary.opacity(0.1))
+            .cornerRadius(6)
             // Tab Picker
             HStack(spacing: 0) {
                 tabButton(title: "History", icon: "clock.fill", tab: "history", count: library.history.count)
@@ -57,8 +73,13 @@ struct LibraryView: View {
     }
     
     private func trackList(tracks: [SavedTrack], emptyMessage: String, emptyIcon: String) -> some View {
-        Group {
-            if tracks.isEmpty {
+        let filtered = tracks.filter { 
+            searchText.isEmpty || 
+            $0.title.localizedCaseInsensitiveContains(searchText) || 
+            $0.artist.localizedCaseInsensitiveContains(searchText) 
+        }
+        return Group {
+            if filtered.isEmpty {
                 VStack(spacing: 8) {
                     Image(systemName: emptyIcon)
                         .font(.system(size: 24))
@@ -72,7 +93,7 @@ struct LibraryView: View {
             } else {
                 ScrollView {
                     VStack(spacing: 2) {
-                        ForEach(tracks) { track in
+                        ForEach(filtered) { track in
                             trackRow(track: track)
                         }
                     }
