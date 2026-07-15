@@ -300,9 +300,11 @@ final class AudioPlayerService: NSObject, ObservableObject {
             self.currentOutputDeviceID = id
         }
         
-        let wasPlaying = engine.isRunning
+        let wasPlaying = self.isPlaying
+        let pos = self.currentTime
+        
         if wasPlaying {
-            engine.pause()
+            self.pause()
         }
         
         AudioUnitSetProperty(
@@ -317,6 +319,8 @@ final class AudioPlayerService: NSObject, ObservableObject {
         if wasPlaying {
             do {
                 try engine.start()
+                self.seek(to: pos)
+                self.resume()
             } catch {
                 print("Failed to restart engine after changing device: \(error)")
             }
