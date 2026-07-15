@@ -728,6 +728,8 @@ class AppState: ObservableObject {
     }
     
     private func sendTrackNotification(track: TrackInfo) {
+        guard Bundle.main.bundleIdentifier != nil else { return } // Prevent crash when running outside .app bundle
+        
         let center = UNUserNotificationCenter.current()
         let content = UNMutableNotificationContent()
         content.title = track.title
