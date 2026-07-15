@@ -49,6 +49,13 @@ brew install pass-with-high-score/tap/petify
 - Drag & Drop an audio file into the popover to play locally.
 - Access **Settings** (gear icon) to tweak lyrics animations, desktop pet behaviors, and audio quality.
 
+## Support
+
+If you enjoy using Petify and want to support its development, consider buying me a coffee or sponsoring me on GitHub! It helps keep the project alive and brings new features.
+
+- ☕️ [Buy Me a Coffee](https://buymeacoffee.com/nguyenquane)
+- 💖 [GitHub Sponsors](https://github.com/sponsors/pass-with-high-score)
+
 ## License
 
 MIT
