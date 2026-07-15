@@ -19,7 +19,15 @@ A beautifully designed, feature-rich macOS menubar audio player built with Swift
 - macOS 12.0+
 - Xcode Command Line Tools or Xcode
 
-## Installation & Build
+## Installation
+
+The easiest way to install Petify is via Homebrew:
+
+```bash
+brew install pass-with-high-score/tap/petify
+```
+
+### Build from Source
 
 1. Clone the repository:
    ```bash
