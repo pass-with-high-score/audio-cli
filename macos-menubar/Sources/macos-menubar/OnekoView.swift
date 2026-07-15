@@ -139,7 +139,7 @@ struct OnekoView: View {
             catPos.x += speed
             if catPos.x >= size.width - 16 {
                 catPos.x = size.width - 16
-                wallClawTick = 40
+                handleEdgeHit(from: .right)
             } else if catPos.x <= 16 {
                 catPos.x = 16
                 direction = .up
@@ -149,7 +149,7 @@ struct OnekoView: View {
             catPos.y += speed
             if catPos.y >= size.height - 16 {
                 catPos.y = size.height - 16
-                wallClawTick = 40
+                handleEdgeHit(from: .down)
             } else if catPos.y <= 16 {
                 catPos.y = 16
                 direction = .right
@@ -159,7 +159,7 @@ struct OnekoView: View {
             catPos.x -= speed
             if catPos.x <= 16 {
                 catPos.x = 16
-                wallClawTick = 40
+                handleEdgeHit(from: .left)
             } else if catPos.x >= size.width - 16 {
                 catPos.x = size.width - 16
                 direction = .down
@@ -169,11 +169,26 @@ struct OnekoView: View {
             catPos.y -= speed
             if catPos.y <= 16 {
                 catPos.y = 16
-                wallClawTick = 40
+                handleEdgeHit(from: .up)
             } else if catPos.y >= size.height - 16 {
                 catPos.y = size.height - 16
                 direction = .left
             }
+        }
+    }
+    
+    func handleEdgeHit(from currentDir: Direction) {
+        // 50% chance to claw the wall, 50% chance to just turn around
+        if Int.random(in: 0...1) == 0 {
+            wallClawTick = Int.random(in: 30...60)
+        } else {
+            switch currentDir {
+            case .right: direction = .down
+            case .down: direction = .left
+            case .left: direction = .up
+            case .up: direction = .right
+            }
+            maybeSleep()
         }
     }
     
