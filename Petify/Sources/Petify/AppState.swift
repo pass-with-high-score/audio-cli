@@ -45,6 +45,7 @@ class AppState: ObservableObject {
 
     let ytdlp = YtDlpService()
     @Published var audioPlayer = AudioPlayerService()
+    @Published var musicLibrary = MusicLibraryService()
     var tracks: [TrackInfo] = []
     var currentTrackIndex: Int = -1
 
@@ -319,6 +320,10 @@ class AppState: ObservableObject {
         status.duration = 0
         status.percent = 0
         lyricsOffset = 0.0
+
+        // Save to history
+        let savedTrack = SavedTrack.from(track: track)
+        musicLibrary.addToHistory(savedTrack)
 
         // Fetch lyrics for new track
         if track.title != lastSearchedTitle {

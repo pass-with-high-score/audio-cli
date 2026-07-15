@@ -6,6 +6,7 @@ struct PopoverView: View {
     @ObservedObject var state: AppState
     @State private var searchQuery: String = ""
     @FocusState private var isSearchFocused: Bool
+    @State private var showLibrary: Bool = false
     
     var body: some View {
         VStack(spacing: 12) {
@@ -232,6 +233,12 @@ struct PopoverView: View {
                         .font(.system(size: 16))
                         .foregroundColor(state.repeatMode != .off ? .accentColor : .secondary)
                 }.buttonStyle(.plain).frame(maxWidth: .infinity)
+                
+                Button(action: { toggleCurrentFavorite() }) {
+                    Image(systemName: isCurrentFavorite ? "heart.fill" : "heart")
+                        .font(.system(size: 16))
+                        .foregroundColor(isCurrentFavorite ? .pink : .secondary)
+                }.buttonStyle(.plain).frame(maxWidth: .infinity)
             }
             
             // 6. Volume
@@ -249,6 +256,29 @@ struct PopoverView: View {
                 }), total: 1.0)
             }
             .padding(.horizontal, 10)
+            
+            // Library Toggle
+            Divider()
+            
+            Button(action: { withAnimation { showLibrary.toggle() } }) {
+                HStack {
+                    Image(systemName: "books.vertical.fill")
+                        .font(.system(size: 12))
+                    Text("Library")
+                        .font(.system(size: 12, weight: .medium))
+                    Spacer()
+                    Image(systemName: showLibrary ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 10))
+                }
+                .foregroundColor(showLibrary ? .accentColor : .secondary)
+                .padding(.horizontal, 4)
+            }
+            .buttonStyle(.plain)
+            
+            if showLibrary {
+                LibraryView(state: state, library: state.musicLibrary)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+            }
             
             // 7. Queue Section
             VStack(spacing: 8) {
@@ -327,5 +357,19 @@ struct PopoverView: View {
             searchQuery = ""
             isSearchFocused = false
         }
+    }
+    
+    private var isCurrentFavorite: Bool {
+        guard state.currentTrackIndex >= 0 && state.currentTrackIndex < state.tracks.count else { return false }
+        let track = state.tracks[state.currentTrackIndex]
+        let id = track.videoId.isEmpty ? track.url : track.videoId
+        return state.musicLibrary.isFavorite(id: id)
+    }
+    
+    private func toggleCurrentFavorite() {
+        guard state.currentTrackIndex >= 0 && state.currentTrackIndex < state.tracks.count else { return }
+        let track = state.tracks[state.currentTrackIndex]
+        let saved = SavedTrack.from(track: track)
+        state.musicLibrary.toggleFavorite(saved)
     }
 }
