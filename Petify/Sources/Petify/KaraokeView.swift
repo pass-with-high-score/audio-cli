@@ -191,30 +191,37 @@ struct KaraokeLineView: View {
     @ObservedObject var state: AppState
     
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 60.0)) { context in
-            let currentTime = state.audioPlayer.currentTime - state.lyricsOffset
-            let progress = computeProgress(currentTime: currentTime)
-            
-            Text(line.text)
-                .font(.system(size: isCurrent ? 42 : 32, weight: .heavy, design: .rounded))
-                .foregroundColor(isPast ? .white.opacity(0.3) : .white.opacity(0.5))
-                .overlay(
-                    GeometryReader { geo in
-                        Text(line.text)
-                            .font(.system(size: isCurrent ? 42 : 32, weight: .heavy, design: .rounded))
-                            .foregroundColor(.white)
-                            .mask(
-                                Rectangle()
-                                    .frame(width: geo.size.width * progress)
-                                    .offset(x: 0)
-                                    .frame(width: geo.size.width, alignment: .leading)
-                            )
-                    }
-                )
-                .scaleEffect(isCurrent ? 1.05 : 1.0, anchor: .leading)
-                .blur(radius: isCurrent ? 0 : (isPast ? 1 : 2))
-                .animation(.interpolatingSpring(stiffness: 100, damping: 15), value: isCurrent)
+        if isCurrent {
+            TimelineView(.animation(minimumInterval: 1.0 / 60.0)) { context in
+                let currentTime = state.audioPlayer.currentTime - state.lyricsOffset
+                lineContent(progress: computeProgress(currentTime: currentTime))
+            }
+        } else {
+            lineContent(progress: isPast ? 1.0 : 0.0)
         }
+    }
+    
+    @ViewBuilder
+    private func lineContent(progress: CGFloat) -> some View {
+        Text(line.text)
+            .font(.system(size: isCurrent ? 42 : 32, weight: .heavy, design: .rounded))
+            .foregroundColor(isPast ? .white.opacity(0.3) : .white.opacity(0.5))
+            .overlay(
+                GeometryReader { geo in
+                    Text(line.text)
+                        .font(.system(size: isCurrent ? 42 : 32, weight: .heavy, design: .rounded))
+                        .foregroundColor(.white)
+                        .mask(
+                            Rectangle()
+                                .frame(width: geo.size.width * progress)
+                                .offset(x: 0)
+                                .frame(width: geo.size.width, alignment: .leading)
+                        )
+                }
+            )
+            .scaleEffect(isCurrent ? 1.05 : 1.0, anchor: .leading)
+            .blur(radius: isCurrent ? 0 : (isPast ? 1 : 2))
+            .animation(.interpolatingSpring(stiffness: 100, damping: 15), value: isCurrent)
     }
     
     private func computeProgress(currentTime: Double) -> CGFloat {
